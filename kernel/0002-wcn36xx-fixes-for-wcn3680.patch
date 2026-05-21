@@ -1,66 +1,18 @@
 diff --git a/drivers/net/wireless/ath/wcn36xx/hal.h b/drivers/net/wireless/ath/wcn36xx/hal.h
-index ef9ea4ff8..8b092c18f 100644
+index ef9ea4ff8..c8b50c8e2 100644
 --- a/drivers/net/wireless/ath/wcn36xx/hal.h
 +++ b/drivers/net/wireless/ath/wcn36xx/hal.h
-@@ -1745,12 +1745,12 @@ struct wcn36xx_hal_config_sta_params_v1 {
- 	u8 vht_tx_mu_beamformee_capable:1;
- 	u8 reserved:4;
- 
--	/* These rates are the intersection of peer and self capabilities. */
--	struct wcn36xx_hal_supported_rates_v1 supported_rates;
--
- 	u8 vht_capable;
- 	u8 vht_tx_channel_width_set;
- 
-+	/* These rates are the intersection of peer and self capabilities. */
-+	struct wcn36xx_hal_supported_rates_v1 supported_rates;
-+
- } __packed;
- 
- #define WCN36XX_DIFF_STA_PARAMS_V1_NOVHT 10
-@@ -1946,16 +1946,6 @@ struct wcn36xx_hal_config_bss_params {
- 	/* Reserved to align next field on a dword boundary */
- 	u8 reserved;
- 
--	/* TODO move sta to the end for 3680 */
--	/* Context of the station being added in HW
--	 *  Add a STA entry for "itself" -
--	 *
--	 *  On AP  - Add the AP itself in an "STA context"
--	 *
--	 *  On STA - Add the AP to which this STA is joining in an
--	 *  "STA context"
--	 */
--	struct wcn36xx_hal_config_sta_params sta;
- 	/* SSID of the BSS */
- 	struct wcn36xx_hal_mac_ssid ssid;
- 
-@@ -2028,6 +2018,11 @@ struct wcn36xx_hal_config_bss_params {
- 	/* maxTxPower has max power to be used after applying the power
- 	 * constraint if any */
- 	s8 max_tx_power;
-+	/* sta MUST be the last field for compatibility with the WCN3680
-+	 * Pronto firmware (e.g. Motorola sanders stock 1.5.1.2). With sta in
-+	 * the middle, the FW miscomputes BSS context size and returns
-+	 * MEM_FAIL=5 on hal_config_bss. */
-+	struct wcn36xx_hal_config_sta_params sta;
- } __packed;
- 
- struct wcn36xx_hal_config_bss_req_msg {
-@@ -2174,11 +2169,10 @@ struct wcn36xx_hal_config_bss_params_v1 {
+@@ -2174,6 +2174,9 @@ struct wcn36xx_hal_config_bss_params_v1 {
  	 *  On STA - Add the AP to which this STA is joining in an
  	 *  "STA context"
  	 */
--	struct wcn36xx_hal_config_sta_params_v1 sta;
--
++	u32 dot11_mode;
++	u32 phy_mode;
++
+ 	struct wcn36xx_hal_config_sta_params_v1 sta;
+ 
  	u8 vht_capable;
- 	u8 vht_tx_channel_width_set;
- 
-+	struct wcn36xx_hal_config_sta_params_v1 sta;
- } __packed;
- 
- #define WCN36XX_DIFF_BSS_PARAMS_V1_NOVHT (WCN36XX_DIFF_STA_PARAMS_V1_NOVHT + 2)
-@@ -4166,6 +4160,9 @@ struct wcn36xx_hal_tx_compl_ind_msg {
+@@ -4166,6 +4169,9 @@ struct wcn36xx_hal_tx_compl_ind_msg {
  
  	/* Tx Complete Indication Success or Failure */
  	u32 status;
@@ -71,10 +23,10 @@ index ef9ea4ff8..8b092c18f 100644
  
  struct wcn36xx_hal_wlan_host_suspend_ind_msg {
 diff --git a/drivers/net/wireless/ath/wcn36xx/smd.c b/drivers/net/wireless/ath/wcn36xx/smd.c
-index 813553edc..0cd74998a 100644
+index 813553edc..aba5e6e0e 100644
 --- a/drivers/net/wireless/ath/wcn36xx/smd.c
 +++ b/drivers/net/wireless/ath/wcn36xx/smd.c
-@@ -1706,7 +1706,7 @@ static int wcn36xx_smd_config_bss_v1(struct wcn36xx *wcn,
+@@ -1706,13 +1706,18 @@ static int wcn36xx_smd_config_bss_v1(struct wcn36xx *wcn,
  
  	memcpy(&bss->ext_set_sta_key_param,
  	       &bss_v0.ext_set_sta_key_param,
@@ -83,3 +35,14 @@ index 813553edc..0cd74998a 100644
  
  	bss->wcn36xx_hal_persona = bss_v0.wcn36xx_hal_persona;
  	bss->spectrum_mgt_enable = bss_v0.spectrum_mgt_enable;
+ 	bss->tx_mgmt_power = bss_v0.tx_mgmt_power;
+ 	bss->max_tx_power = bss_v0.max_tx_power;
+ 
++	/* WCN3680 Pronto 1.5.1.2 expects these fields before sta context.
++	 * Keep them as 0 to see if the offset was the only issue. */
++	bss->dot11_mode = 0;
++	bss->phy_mode = 0;
++
+ 	wcn36xx_smd_set_bss_vht_params(vif, sta_80211, bss);
+ 
+ 	PREPARE_HAL_BUF(wcn->hal_buf, (*msg_body));
