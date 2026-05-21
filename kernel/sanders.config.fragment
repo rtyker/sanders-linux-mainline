@@ -140,3 +140,13 @@ CONFIG_BT_BNEP=y
 CONFIG_IIO=y
 CONFIG_LTR501=y
 CONFIG_WCN36XX_DEBUG=y
+
+# LED de notificacao frontal (MPP2 do pmi8950 via leds-gpio). Habilita
+# tambem o sysfs trigger pra heartbeat/timer/disk-activity etc.
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+CONFIG_LEDS_GPIO=y
+CONFIG_LEDS_TRIGGERS=y
+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+CONFIG_LEDS_TRIGGER_TIMER=y
+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y

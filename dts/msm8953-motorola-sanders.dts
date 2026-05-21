@@ -69,6 +69,23 @@
 		};
 	};
 
+	/*
+	 * LED de notificacao frontal — branco unico, ligado no MPP2 do
+	 * pmi8950 como current-sink. Downstream Moto (qpnp-leds) usava modo
+	 * "manual" com source-sel=1 e current=5mA. No mainline atual nao ha
+	 * driver MPP-as-current-sink; usamos leds-gpio (on/off apenas).
+	 * Brilho/PWM via pmi8950_pwm fica como upgrade futuro.
+	 */
+	leds {
+		compatible = "gpio-leds";
+
+		led-notification {
+			label = "white:notification";
+			gpios = <&pmi8950_mpps 1 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+	};
+
 	reserved-memory {
 		qseecom_mem: qseecom@84300000 {
 			reg = <0x0 0x84300000 0x0 0x2000000>;

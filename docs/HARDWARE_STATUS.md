@@ -1,6 +1,6 @@
 # Hardware status
 
-Última atualização: 2026-05-20.
+Última atualização: 2026-05-21.
 
 ## Visão geral
 
@@ -26,6 +26,7 @@
 | Proximidade + luz ambiente (LiteON LTR559) | ⚠️ | I2C @ bus 1 / 0x23 probou OK no driver mainline `ltr501`. `/sys/bus/iio/devices/iio:device0/in_proximity_raw` reage a obstrução (variações 700–960). ALS (`in_intensity_*`, `in_illuminance_input`) trava em 0 — driver inicializa ALS_CONTR mas o chip não emite ALS_RDY no STATUS. Calibração de threshold de proximidade ainda crua (stock usava `ps-threshold=800`, mainline binding só expõe `proximity-near-level` semântico). |
 | Acelerômetro / giroscópio / magnetômetro | ❌ | **Não** estão em I2C no stock — passam pela SSC (Sensor Subsystem) no SLPI/DSP, caminho proprietário (`sns_dsps` blob + IPC QMI). Sem driver mainline prático hoje. Bloqueia autorotate do Phosh. |
 | GPU (Adreno 506) | ❌ | freedreno provavelmente funcionaria com mais trabalho |
+| LED de notificação frontal | ⚠️ | Enumerado como `/sys/class/leds/white:notification` via `gpio-leds` no MPP2 do pmi8950 (DTS + `CONFIG_LEDS_GPIO=y`). `echo 1 > brightness` retorna sucesso mas **validação visual pendente** — usuário ainda não viu o LED acender fisicamente. Pode precisar inverter polaridade (`GPIO_ACTIVE_LOW`) ou trocar pra `pmi8950_pwm`+`leds-pwm`. |
 
 ## Detalhes do que **não** funciona ainda
 
