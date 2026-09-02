@@ -1,0 +1,16 @@
+[Unit]
+Description=Set notification LED to server status (sanders)
+# Roda apos a rede estar potencialmente disponivel. network-online.target
+# e o ponto ideal — se a rede ainda nao subiu, o LED fica em blink
+# (sinalizando ausencia de rede).
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/sys/class/leds/white:notification
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/sanders-led.sh status
+
+[Install]
+WantedBy=multi-user.target
