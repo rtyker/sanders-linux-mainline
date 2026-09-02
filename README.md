@@ -7,6 +7,8 @@ o kernel Linux mainline upstream. Não há porte oficial em
 [postmarketOS](https://postmarketos.org/),
 [Mobian](https://mobian-project.org/) ou outras distros para mobile.
 
+> ⚠️ **Unidade física de bancada usada nos testes ao vivo: Moto G5 Plus (`potter`), não `sanders`.** Confirmado via `fastboot getvar all` (`product: potter`, `board: potter`) em 2026-09-02. Este repositório e a maior parte da documentação são escritos pro `sanders`, mas os testes "ao vivo"/"confirmado" nos docs deste projeto até agora rodaram no `potter` físico disponível — hardware quase idêntico (ver `AGENTS.md` da raiz do projeto), porém não é a mesma unidade.
+>
 > ✅ **Estado: sistema interativo via cabo USB + internet.** Boot completo
 > do kernel mainline → Arch Linux ARM → autologin root no framebuffer +
 > **shell via CDC ACM no host** (`/dev/ttyACM0`) + **rede USB (ECM)** com
