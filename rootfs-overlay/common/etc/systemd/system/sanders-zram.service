@@ -1,0 +1,12 @@
+[Unit]
+Description=Inicializa Swap ZRAM em RAM (Otimização de eMMC)
+After=local-fs.target
+Before=swap.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanders-zram.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -444,3 +444,13 @@
 	vdddig-supply = <&pm8953_l5>;
 };
 
+&soc {
+	watchdog@b017000 {
+		compatible = "qcom,kpss-wdt";
+		reg = <0x0b017000 0x1000>;
+		clocks = <&sleep_clk>;
+		status = "okay";
+	};
+};
+
+

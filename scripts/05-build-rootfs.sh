@@ -57,11 +57,14 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
         /etc/locale.gen
     arch-chroot "$MNT" locale-gen >/dev/null 2>&1 || warn "locale-gen falhou"
 
-    # Samba: util pros dois flavors (compartilhar /home via Wi-Fi/USB).
+    # Pacotes base para os dois flavors.
+    msg "instalando pacotes base (samba + terminus-font)..."
+    # terminus-font: corrige systemd-vconsole-setup.service (setfont ter-v16b).
+    # samba: util pros dois flavors (compartilhar /home via Wi-Fi/USB).
     # Nao habilita servico — usuario decide com `systemctl enable smb nmb`.
-    msg "instalando samba (sem habilitar smb/nmb)..."
-    arch-chroot "$MNT" pacman -Sy --noconfirm --needed samba \
-        || warn "pacman -S samba falhou"
+    arch-chroot "$MNT" pacman -Sy --noconfirm --needed \
+        samba terminus-font \
+        || warn "pacman -S pacotes base falhou"
     if [ "$FLAVOR" = "desktop" ]; then
         msg "instalando stack desktop (weston + xwayland + mesa) via arch-chroot..."
         # Instala dois compositores: phosh (default, shell mobile) +
@@ -201,12 +204,19 @@ ln -sf /usr/lib/systemd/system/systemd-networkd.service \
 ln -sf /usr/lib/systemd/system/systemd-networkd.socket \
     "$MNT/etc/systemd/system/sockets.target.wants/systemd-networkd.socket"
 
-# SSH: permite login root com senha (padrao Arch ARM eh "root"). Habilita sshd.
-msg "habilitando sshd com PermitRootLogin yes..."
+# SSH: login root so por chave publica (Ed25519 recomendado). Desabilita
+# senha pra impedir brute-force. O usuario deve copiar sua chave pub
+# pra /root/.ssh/authorized_keys antes de habilitar sshd (via serial).
+# IMPORTANTE: a chave DEVE estar em authorized_keys ANTES de desabilitar
+# senha, caso contrario trava fora do device.
+msg "configurando sshd (chave apenas, sem senha)..."
 mkdir -p "$MNT/etc/ssh/sshd_config.d"
 cat > "$MNT/etc/ssh/sshd_config.d/10-sanders.conf" <<'EOF'
-PermitRootLogin yes
-PasswordAuthentication yes
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+UsePAM yes
 EOF
 ln -sf /usr/lib/systemd/system/sshd.service \
     "$MNT/etc/systemd/system/multi-user.target.wants/sshd.service"
@@ -243,7 +253,8 @@ Wants=systemd-networkd.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/ping -c 1 -W 1 10.42.0.1
+ExecStart=/bin/bash -c '[ "$(cat /sys/class/net/usb0/carrier 2>/dev/null)" = "1" ] && /usr/bin/ping -c 1 -W 1 10.42.0.1 || true'
+
 EOF
 cat > "$MNT/etc/systemd/system/usb-keepalive.timer" <<'EOF'
 [Unit]
@@ -276,6 +287,17 @@ done
 if [ "$FLAVOR" = "desktop" ]; then
     rm -rf "$MNT/etc/systemd/system/getty@tty1.service.d"
 fi
+
+# fstab: fonte unica e o overlay (rootfs-overlay/common/etc/fstab), ja
+# aplicado no loop de overlays acima. NAO reescrever aqui — um cat>
+# heredoc chegou a existir nesse ponto e sobrescrevia silenciosamente o
+# fstab do overlay (que tem as entradas de MicroSD), fazendo o suporte a
+# MicroSD nunca ir pra imagem final. Ver git log deste arquivo.
+#
+# Ponto de montagem do MicroSD (fstab referencia /mnt/microsd via
+# LABEL=SDCARD + x-systemd.automount; o diretorio precisa existir na
+# imagem pro mount funcionar).
+mkdir -p "$MNT/mnt/microsd"
 
 sync
 umount "$MNT"

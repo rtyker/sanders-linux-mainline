@@ -1,0 +1,16 @@
+# Config fragment para suporte a bateria/carregador no Moto G5s Plus (sanders).
+# Habilita driver do carregador SMB (pmi8996-smbchg) e fuel gauge (pmi8996-fg)
+# do PMIC PMI8950/PMI8996.
+
+# Carregador SMB (Switch-Mode Battery Charger) para PMI8996/PMI8950
+CONFIG_CHARGER_QCOM_SMBCHG=y
+
+# Fuel gauge (medidor de carga) para PMI8996/PMI8950
+CONFIG_BATTERY_QCOM_FG=y
+
+# Battery manager para integração com power_supply subsystem
+CONFIG_BATTERY_QCOM_BATTMGR=y
+
+# Power supply subsystem (base)
+CONFIG_POWER_SUPPLY=y
+CONFIG_POWER_SUPPLY_HWMON=y

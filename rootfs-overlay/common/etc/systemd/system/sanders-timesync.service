@@ -1,0 +1,12 @@
+[Unit]
+Description=Sincronização de Relógio NTP pós-Rede
+After=network-online.target systemd-resolved.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanders-timesync.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

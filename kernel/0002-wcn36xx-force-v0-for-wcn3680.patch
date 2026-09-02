@@ -1,0 +1,27 @@
+diff --git a/drivers/net/wireless/ath/wcn36xx/smd.c b/drivers/net/wireless/ath/wcn36xx/smd.c
+--- a/drivers/net/wireless/ath/wcn36xx/smd.c
++++ b/drivers/net/wireless/ath/wcn36xx/smd.c
+@@ -1562,7 +1562,10 @@ int wcn36xx_smd_config_sta(struct wcn36xx *wcn, struct ieee80211_vif *vif,
+ 
+ 	mutex_lock(&wcn->hal_mutex);
+ 
+-	if (!wcn36xx_is_fw_version(wcn, 1, 2, 2, 24))
++	/* WCN3680 Pronto 1.5.1.2 rejects the V1 STA context with MEM_FAIL. */
++	if (wcn->rf_id == RF_IRIS_WCN3680)
++		ret = wcn36xx_smd_config_sta_v0(wcn, vif, sta);
++	else if (!wcn36xx_is_fw_version(wcn, 1, 2, 2, 24))
+ 		ret = wcn36xx_smd_config_sta_v1(wcn, vif, sta);
+ 	else
+ 		ret = wcn36xx_smd_config_sta_v0(wcn, vif, sta);
+@@ -1889,7 +1889,10 @@ int wcn36xx_smd_config_bss(struct wcn36xx *wcn, struct ieee80211_vif *vif,
+ 
+ 	mutex_lock(&wcn->hal_mutex);
+ 
+-	if (!wcn36xx_is_fw_version(wcn, 1, 2, 2, 24))
++	/* Keep BSS and STA contexts on the same legacy HAL layout. */
++	if (wcn->rf_id == RF_IRIS_WCN3680)
++		ret = wcn36xx_smd_config_bss_v0(wcn, vif, sta, bssid, update);
++	else if (!wcn36xx_is_fw_version(wcn, 1, 2, 2, 24))
+ 		ret = wcn36xx_smd_config_bss_v1(wcn, vif, sta, bssid, update);
+ 	else
+ 		ret = wcn36xx_smd_config_bss_v0(wcn, vif, sta, bssid, update);
