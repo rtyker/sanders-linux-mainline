@@ -1,0 +1,7 @@
+[Unit]
+Description=Verificação Periódica de Telemetria Térmica
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanders-thermal.sh --warn=70 --crit=85
