@@ -124,16 +124,23 @@
 		regulator-boot-on;
 	};
 
+	/*
+	 * Valores extraidos do DTB de fabrica real (decompilado de
+	 * chroot_rootfs_motorola-potter/boot/msm8953-motorola-potter.dtb,
+	 * mesma bateria do sanders/potter): charge-full-design 0x2e5b30 =
+	 * 3038000 uAh, voltage-min 0x33e140 = 3400000 uV, voltage-max
+	 * 0x432380 = 4400000 uV, constant-charge-current-max 0xf4240 =
+	 * 1000000 uA. So a descricao da bateria; nao ha driver mainline
+	 * pra charger/fuel-gauge deste PMIC ainda (ver &pmi8950_smbcharger
+	 * e &pmi8950_fg abaixo) — os numeros ficam prontos pro dia que
+	 * existir driver.
+	 */
 	battery: battery {
 		compatible = "simple-battery";
-		charge-full-design-microamp-hours = <3000000>;
-		energy-full-design-microwatt-hours = <11400000>;
+		charge-full-design-microamp-hours = <3038000>;
 		voltage-min-design-microvolt = <3400000>;
 		voltage-max-design-microvolt = <4400000>;
-		constant-charge-current-max-microamp = <2000000>;
-		constant-charge-voltage-max-microvolt = <4400000>;
-		precharge-current-microamp = <256000>;
-		charge-term-current-microamp = <60000>;
+		constant-charge-current-max-microamp = <1000000>;
 	};
 };
 
@@ -440,6 +447,17 @@
 	vdddig-supply = <&pm8953_l5>;
 };
 
+/*
+ * NAO existe TI bq27426 neste hardware. O DTB de fabrica real
+ * (chroot_rootfs_motorola-potter/boot/msm8953-motorola-potter.dtb)
+ * nao menciona bq27426 em lugar nenhum; o fuel-gauge de fabrica e o
+ * integrado no proprio PMI8996 (ver &pmi8950_fg abaixo). Um no
+ * "ti,bq27426" chegou a existir aqui, dentro de &soc — alem de nao
+ * ter respaldo em hardware, "ti,bq27426" so casa via I2C
+ * (bq27xxx_battery_i2c_of_match_table) e &soc e barramento de
+ * periferico mapeado em memoria, entao nunca bindaria de qualquer
+ * forma. Removido em 2026-09-02.
+ */
 &soc {
 	watchdog@b017000 {
 		compatible = "qcom,kpss-wdt";
@@ -447,14 +465,31 @@
 		clocks = <&sleep_clk>;
 		status = "okay";
 	};
+};
 
-	fuel_gauge: fuel-gauge@55 {
-		compatible = "ti,bq27426";
-		reg = <0x55 0x1>;
-		monitored-battery = <&battery>;
-		status = "okay";
-	};
+/*
+ * Charger + fuel-gauge integrados no PMI8996 (confirmados no DTB de
+ * fabrica: smbchager@1000 / fuel-gauge@4000 dentro do pmic@2 do
+ * PMI8950). Habilitados aqui, mas SEM efeito pratico ainda: nao
+ * existe driver mainline pra "qcom,pmi8996-smbchg" nem
+ * "qcom,pmi8996-fg" (verificado em drivers/power/supply/ e
+ * Documentation/devicetree/bindings/power/supply/ — nenhum dos dois
+ * compatible aparece). Os nos ficam prontos, documentados e corretos,
+ * pro dia que alguem escrever/portar o driver — ate la sao inertes
+ * (mesmo resultado pratico que /sys/class/power_supply/ vazio, hoje
+ * confirmado ao vivo). Labels adicionados em
+ * kernel/0004-pmi8950-battery-charger-nodes.patch (pmi8950.dtsi
+ * upstream nao tem esses nos).
+ */
+&pmi8950_smbcharger {
+	monitored-battery = <&battery>;
+	status = "okay";
+};
 
+&pmi8950_fg {
+	monitored-battery = <&battery>;
+	power-supplies = <&pmi8950_smbcharger>;
+	status = "okay";
 };
 
 

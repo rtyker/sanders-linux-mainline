@@ -209,22 +209,31 @@ CONFIG_WATCHDOG_CORE=y
 CONFIG_WATCHDOG_SYSFS=y
 CONFIG_QCOM_WDT=y
 
-# Bateria e Carregador — NAO existe driver de charger/fuel-gauge
-# mainline pro PMI8950/PMI8996 deste device (verificado 2026-09-02):
-# pmi8950.dtsi upstream so tem VADC/GPIO/MPP/LAB-IBB/PWM/WLED, sem
-# nenhum no de charger/fg; nenhum driver em drivers/power/supply/
-# menciona pmi8950/pmi8996. CONFIG_CHARGER_QCOM_SMBCHG e
-# CONFIG_BATTERY_QCOM_FG nao existem no Kconfig (nomes inventados).
-# CONFIG_BATTERY_QCOM_BATTMGR existe mas e pra outra geracao de
-# hardware (PMIC GLINK dos Snapdragon 8-gen recentes via AUXILIARY_BUS,
-# nao o SPMI direto do PMI8950). Isso e trabalho de bring-up de driver
-# do zero, nao ajuste de devicetree — ver ROADMAP_AND_TODOS.md.
-#
-# Mantido so o que e real e inofensivo (bq27xxx e um fuel-gauge I2C
-# comum, mas sem no de devicetree correspondente hoje ele so fica
-# carregado sem bindar em nada — exatamente o que já foi observado
-# ao vivo no device).
+# Bateria e Carregador — a topologia real (charger+fuel-gauge
+# integrados no PMI8996) esta corretamente descrita em
+# dts/msm8953-motorola-sanders.dts (&pmi8950_smbcharger, &pmi8950_fg)
+# + kernel/0004-pmi8950-battery-charger-nodes.patch, com dados
+# confirmados no DTB de fabrica real e DTB compilado/validado com
+# sucesso (labels e phandles resolvem certo). MAS nao ha config pra
+# habilitar aqui: nao existe driver mainline pra "qcom,pmi8996-smbchg"
+# nem "qcom,pmi8996-fg" (nenhum arquivo em drivers/power/supply/ nem
+# binding em Documentation/devicetree/bindings/power/supply/ os
+# menciona) — os nos ficam status=okay mas inertes ate alguem
+# escrever/portar esse driver. CONFIG_CHARGER_QCOM_SMBCHG e
+# CONFIG_BATTERY_QCOM_FG nao existem no Kconfig (nomes inventados,
+# nao confundir); CONFIG_BATTERY_QCOM_BATTMGR existe mas e pra outra
+# geracao de hardware (PMIC GLINK dos Snapdragon 8-gen via
+# AUXILIARY_BUS, nao o SPMI direto do PMI8950). Ver ROADMAP_AND_TODOS.md.
 CONFIG_POWER_SUPPLY=y
 CONFIG_POWER_SUPPLY_HWMON=y
-CONFIG_BATTERY_BQ27XXX=y
-CONFIG_BATTERY_BQ27XXX_I2C=y
+
+# USB OTG Ethernet (host mode) — permite usar adaptadores USB-C para
+# Ethernet (CDC ECM, RNDIS, CDC NCM) quando o DWC3 troca pra host mode.
+# Necessario pra operacao standalone do servidor sem cabo USB ao PC.
+# Framework USB networking + drivers pra adaptadores comuns.
+CONFIG_USB_USBNET=y
+CONFIG_USB_NET_CDCETHER=y
+CONFIG_USB_NET_CDC_NCM=y
+CONFIG_USB_NET_CDC_SUBSET=y
+CONFIG_USB_NET_CDC_SUBSET_ENABLE=y
+CONFIG_USB_RNDIS_HOST=y

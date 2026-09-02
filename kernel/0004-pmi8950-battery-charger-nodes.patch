@@ -1,0 +1,36 @@
+diff --git a/arch/arm64/boot/dts/qcom/pmi8950.dtsi b/arch/arm64/boot/dts/qcom/pmi8950.dtsi
+index 5bd91a5cd..fe11a3e1d 100644
+--- a/arch/arm64/boot/dts/qcom/pmi8950.dtsi
++++ b/arch/arm64/boot/dts/qcom/pmi8950.dtsi
+@@ -65,6 +65,31 @@ channel@f {
+ 			};
+ 		};
+ 
++		/*
++		 * Charger + fuel-gauge integrados no PMI8996, presentes no
++		 * DTB de fabrica do Moto G5/G5s Plus (sanders/potter) mas
++		 * ausentes deste dtsi upstream. Compatible/reg confirmados
++		 * via decompilacao de msm8953-motorola-potter.dtb (stock).
++		 * Lista de interrupts omitida de proposito: nao existe
++		 * driver mainline pra nenhum dos dois compatible ainda
++		 * (nem em drivers/power/supply/, nem documentado em
++		 * Documentation/devicetree/bindings/power/supply/), entao
++		 * reconstruir os ~30 triplos spmi sem como validar contra
++		 * um driver real so adicionaria numeros nao verificaveis.
++		 * status=disabled aqui; board dts habilita via override.
++		 */
++		pmi8950_smbcharger: smbchg@1000 {
++			compatible = "qcom,pmi8996-smbchg";
++			reg = <0x1000>;
++			status = "disabled";
++		};
++
++		pmi8950_fg: fuel-gauge@4000 {
++			compatible = "qcom,pmi8996-fg";
++			reg = <0x4000>;
++			status = "disabled";
++		};
++
+ 		pmi8950_mpps: mpps@a000 {
+ 			compatible = "qcom,pmi8950-mpp", "qcom,spmi-mpp";
+ 			reg = <0xa000>;
