@@ -58,13 +58,15 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
     arch-chroot "$MNT" locale-gen >/dev/null 2>&1 || warn "locale-gen falhou"
 
     # Pacotes base para os dois flavors.
-    msg "instalando pacotes base (samba + terminus-font)..."
+    msg "instalando pacotes base (samba + terminus-font + bluez + bluez-utils)..."
     # terminus-font: corrige systemd-vconsole-setup.service (setfont ter-v16b).
     # samba: util pros dois flavors (compartilhar /home via Wi-Fi/USB).
+    # bluez e bluez-utils: pilha bluetooth (bluetoothd) e utilitarios CLI (bluetoothctl, btmgmt).
     # Nao habilita servico — usuario decide com `systemctl enable smb nmb`.
     arch-chroot "$MNT" pacman -Sy --noconfirm --needed \
-        samba terminus-font \
+        samba terminus-font bluez bluez-utils \
         || warn "pacman -S pacotes base falhou"
+
     if [ "$FLAVOR" = "desktop" ]; then
         msg "instalando stack desktop (weston + xwayland + mesa) via arch-chroot..."
         # Instala dois compositores: phosh (default, shell mobile) +

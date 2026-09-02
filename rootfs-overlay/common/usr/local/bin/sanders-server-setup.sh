@@ -77,8 +77,9 @@ install_packages() {
     echo "[sanders-server] Instalando suíte de ferramentas de servidor..."
     if command -v pacman >/dev/null 2>&1; then
         pacman -Sy --noconfirm --needed \
-            htop tmux git curl neofetch podman docker \
+            htop tmux git curl neofetch podman docker bluez-utils \
             || echo "[sanders-server] WARN: falha instalando alguns pacotes via pacman"
+
     else
         echo "[sanders-server] ERRO: gerenciador de pacotes pacman não encontrado" >&2
         exit 1
