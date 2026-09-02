@@ -91,14 +91,14 @@ Este documento registra a auditoria técnica de código, scripts, devicetree e c
 
 ## 📊 Tabela Resumo de Bugs Potenciais Identificados
 
-| ID | Componente | Descrição Resumida | Gravidade Potencial |
-|---|---|---|:---:|
-| **BUG-01** | `sanders-battery-guard.sh` | Falha de sintaxe bash se `capacity` sysfs retornar string vazia | Média |
-| **BUG-02** | `sanders-timesync.sh` | Latência/falha de resolução DNS em boots com `systemd-resolved` em inicialização | Baixa |
-| **BUG-03** | `qcom-wdt` / `10-watchdog.conf` | Risco de reset forçado do SoC durante o modo de suspensão de energia (S2idle) | Alta (Se suspend ativo) |
-| **BUG-04** | `sanders-bt-mac.service` | Race condition se `bluetoothd` for ativado via D-Bus antes da alteração do MAC | Média |
-| **BUG-05** | `sanders-server-setup.sh` | Risco de *partial upgrade* ao utilizar `pacman -Sy` no Arch Linux | Média |
-| **BUG-06** | `wcn36xx` Patch 0002 | Trade-off de throughput: limita Wi-Fi WCN3680 a taxas HT (802.11n) sem VHT | Baixa (Informativa) |
+| ID | Componente | Descrição Resumida | Gravidade Potencial | Status (revisão 2026-09-02) |
+|---|---|---|:---:|---|
+| **BUG-01** | `sanders-battery-guard.sh` | Falha de sintaxe bash se `capacity` sysfs retornar string vazia | Média | Não corrigido (escopo do Battery Guard, ficou com o antigravity) |
+| **BUG-02** | `sanders-timesync.sh` | Latência/falha de resolução DNS em boots com `systemd-resolved` em inicialização | Baixa | Não é bug — o script já retry por até 30s exatamente pra cobrir essa janela |
+| **BUG-03** | `qcom-wdt` / `10-watchdog.conf` | Risco de reset forçado do SoC durante o modo de suspensão de energia (S2idle) | Alta (Se suspend ativo) | ✅ Corrigido 2026-09-02: `rootfs-overlay/common/etc/systemd/sleep.conf.d/10-disable-sleep.conf` desabilita suspend/hibernate/hybrid-sleep na raiz (`AllowSuspend=no` etc) — servidor headless não tem motivo pra suspender, e isso fecha o risco por completo, não só mitiga |
+| **BUG-04** | `sanders-bt-mac.service` | Race condition se `bluetoothd` for ativado via D-Bus antes da alteração do MAC | Média | Não corrigido — `bluetooth.service` não está habilitado em lugar nenhum do rootfs (só ativaria via D-Bus se algo chamasse a API do BlueZ manualmente), risco baixo na prática hoje |
+| **BUG-05** | `sanders-server-setup.sh` | Risco de *partial upgrade* ao utilizar `pacman -Sy` no Arch Linux | Média | ✅ Corrigido 2026-09-02: trocado `pacman -Sy` → `pacman -Syu` em `sanders-server-setup.sh` e nos dois pontos de `05-build-rootfs.sh` |
+| **BUG-06** | `wcn36xx` Patch 0002 | Trade-off de throughput: limita Wi-Fi WCN3680 a taxas HT (802.11n) sem VHT | Baixa (Informativa) | Trade-off aceito, não é bug |
 
 ---
-*Relatório de auditoria gerado pelo Antigravity em 2026-09-02.*
+*Relatório de auditoria gerado pelo Antigravity em 2026-09-02. Itens revisados e parcialmente corrigidos por Claude em 2026-09-02.*

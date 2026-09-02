@@ -76,7 +76,12 @@ show_status() {
 install_packages() {
     echo "[sanders-server] Instalando suíte de ferramentas de servidor..."
     if command -v pacman >/dev/null 2>&1; then
-        pacman -Sy --noconfirm --needed \
+        # -Syu, nao -Sy: este script roda num sistema ja instalado, as
+        # vezes muito depois do build da imagem — "-Sy" sozinho sincroniza
+        # a db sem atualizar o que ja esta instalado (partial upgrade),
+        # podendo puxar uma lib nova (glibc/openssl) incompativel com
+        # binarios antigos do sistema. Risco real aqui, nao so no build.
+        pacman -Syu --noconfirm --needed \
             htop tmux git curl neofetch podman docker bluez-utils \
             || echo "[sanders-server] WARN: falha instalando alguns pacotes via pacman"
 

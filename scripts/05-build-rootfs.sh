@@ -66,7 +66,10 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
     # samba: util pros dois flavors (compartilhar /home via Wi-Fi/USB).
     # bluez e bluez-utils: pilha bluetooth (bluetoothd) e utilitarios CLI (bluetoothctl, btmgmt).
     # Nao habilita servico — usuario decide com `systemctl enable smb nmb`.
-    arch-chroot "$MNT" pacman -Sy --noconfirm --needed \
+    # -Syu (nao -Sy sozinho): sincronizar a db sem atualizar os pacotes
+    # ja instalados e o classico partial-upgrade do Arch — pode puxar
+    # uma lib (glibc/openssl) mais nova que quebra binarios ja instalados.
+    arch-chroot "$MNT" pacman -Syu --noconfirm --needed \
         iw wpa_supplicant dhcpcd wireless-regdb crda \
         samba terminus-font bluez bluez-utils \
         || warn "pacman -S pacotes base falhou"
@@ -76,7 +79,7 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
         # Instala dois compositores: phosh (default, shell mobile) +
         # weston (alternativa minimalista). Decisao de qual usar e via
         # systemctl enable/disable. Default no overlay e phosh.
-        arch-chroot "$MNT" pacman -Sy --noconfirm --needed \
+        arch-chroot "$MNT" pacman -Syu --noconfirm --needed \
             phoc phosh squeekboard \
             weston \
             seatd libdisplay-info \
