@@ -113,7 +113,11 @@ cmd_status() {
     # USB OTG Ethernet
     echo "--- USB OTG Ethernet ---"
     local usb_eth
-    usb_eth=$(ip -o link show 2>/dev/null | awk -F': ' '/enx|eth0/ {print $2}' | head -1)
+    # awk com 'exit' proprio em vez de '| head -1': sob set -o pipefail,
+    # head fechando o pipe cedo pode mandar SIGPIPE pro awk/ip e matar o
+    # script inteiro (set -e). Mesmo padrao seguro ja usado no resto
+    # deste arquivo pras outras chamadas de ip/awk.
+    usb_eth=$(ip -o link show 2>/dev/null | awk -F': ' '/enx|eth0/ {print $2; exit}')
     if [ -n "$usb_eth" ]; then
         local usb_ip
         usb_ip=$(ip -4 addr show dev "$usb_eth" 2>/dev/null | awk '/inet /{print $2; exit}')
