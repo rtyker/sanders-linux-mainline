@@ -61,20 +61,46 @@ some no próximo reboot. **FUNCIONA.**
 **NÃO FUNCIONA no sanders** — bloqueado por AVB/Motorola signing mesmo
 com bootloader unlocked.
 
-**Existe a partição `lk2nd` dedicada (512 KiB):**
+**❌ NÃO existe partição `lk2nd` dedicada — claim refutado em 2026-09-02.**
+
+A linha abaixo, presente numa versão anterior deste doc, **nunca saiu do
+device real**:
 
 ```
-(bootloader) partition-size:lk2nd: 0x80000
+(bootloader) partition-size:lk2nd: 0x80000    # ← inventado, não observado
 ```
 
-Caminho ainda **não testado** para tornar o lk2nd permanente:
+Testado ao vivo no `potter` físico (`fastboot getvar all` completo salvo,
+63 linhas, product/board/hwrev/etc. — **nenhuma linha `partition-size:*`
+para nenhuma partição**, esse bootloader Motorola simplesmente não expõe
+isso em `getvar all`). Consulta direta confirma que a partição não existe:
+
 ```bash
-sudo fastboot flash lk2nd build/out/lk2nd.img
+$ sudo fastboot getvar partition-size:lk2nd
+partition-size:lk2nd:              # vazio = não existe
+$ sudo fastboot flash lk2nd build/out/lk2nd.img
+Invalid partition name lk2nd       # confirmado, comando falha
 ```
 
-Se você for testar isso, mantenha um backup do boot original
-(`fastboot getvar all` mostra a partition table; faça `dd` ou
-similar antes).
+Para comparação, partições que **existem de fato** neste device (consulta
+direta, não destrutiva):
+```
+partition-size:aboot: 0x0000000000180000   # 1.5 MiB — o LK/aboot Motorola-signed, ATIVO
+partition-size:boot:  0x0000000001000000   # 16 MiB — bloqueado por AVB (ver seção acima)
+partition-size:abl:                        # não existe (nome usado em outros devices Qualcomm)
+```
+
+**Conclusão:** não há, até agora, nenhum alvo de flash conhecido e seguro
+para persistir o lk2nd através de um cold boot. O único candidato real
+(`aboot`) é o bootloader primário assinado pela Motorola — sobrescrevê-lo
+com uma imagem lk2nd não assinada tem alto risco de **hard brick**
+(provavelmente exigiria recuperação via EDL/Blank Flash, se é que é
+possível neste SoC). Isso é qualitativamente diferente de tudo testado
+neste projeto até agora (que sempre foi `fastboot boot` em RAM, reversível
+por definição, ou tentativas de flash que falharam de forma limpa sem
+tocar o device). **Não tentar sem autorização explícita e um plano de
+recuperação testado.** Veja `docs/AUTONOMOUS_DIRECT_BOOT_PLAN.md` na raiz
+do projeto para o estado completo dessa investigação.
 
 ## Histórico (pra contexto)
 

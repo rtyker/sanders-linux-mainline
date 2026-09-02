@@ -44,9 +44,18 @@ não desativa.
 `flash boot`. Outras partições (`userdata`, `system`, etc.) aceitam
 flash normalmente.
 
-> Não testado, mas provavelmente possível: gravar permanente em
-> `partition-size:lk2nd: 0x80000` (512 KiB), que é uma partição própria
-> do lk2nd. `fastboot flash lk2nd lk2nd.img`. Veja `LK2ND_SETUP.md`.
+> ❌ **REFUTADO em 2026-09-02, testado ao vivo no `potter` físico.** A
+> partição `lk2nd` dedicada **não existe** neste bootloader:
+> `sudo fastboot flash lk2nd build/out/lk2nd.img` → `Invalid partition
+> name lk2nd`. Confirmado também via `fastboot getvar partition-size:lk2nd`
+> → resposta vazia. E mais grave: a linha `(bootloader) partition-size:lk2nd:
+> 0x80000` citada como saída de `fastboot getvar all` neste device
+> **nunca aparece** — este `getvar all` (Motorola moto-msm8953-C0.92) não
+> lista `partition-size:*` para NENHUMA partição (verificado, saída
+> completa não contém essas linhas para nenhum nome). Ou seja, a
+> "descoberta" da partição `lk2nd` dedicada foi **inventada**, não
+> observada. Veja `LK2ND_SETUP.md` para os detalhes e o que isso implica
+> pro plano de boot autônomo.
 
 ## 3. Busybox 1.36.1 quebra ao compilar (`tc.c`)
 
