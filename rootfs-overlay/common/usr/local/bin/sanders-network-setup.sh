@@ -120,7 +120,13 @@ cmd_status() {
     # head fechando o pipe cedo pode mandar SIGPIPE pro awk/ip e matar o
     # script inteiro (set -e). Mesmo padrao seguro ja usado no resto
     # deste arquivo pras outras chamadas de ip/awk.
-    usb_eth=$(ip -o link show 2>/dev/null | awk -F': ' '/enx|eth0/ {print $2; exit}')
+    #
+    # Regex ancorada no campo 2 (nome da interface), nao na linha
+    # inteira: "/enx|eth0/" sem ancora casava qualquer substring —
+    # "vethXXXXXXX" (interfaces do Docker, que e objetivo deste
+    # projeto) pode conter "eth0" como substring (ex. veth0abc123),
+    # dando falso positivo.
+    usb_eth=$(ip -o link show 2>/dev/null | awk -F': ' '$2 ~ /^enx/ || $2 ~ /^eth[0-9]+$/ {print $2; exit}')
     if [ -n "$usb_eth" ]; then
         local usb_ip
         usb_ip=$(ip -4 addr show dev "$usb_eth" 2>/dev/null | awk '/inet /{print $2; exit}')

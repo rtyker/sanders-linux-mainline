@@ -40,6 +40,12 @@ else
     NEW_KEY=$(cat | awk 'NR==1{print}')
 fi
 
+# Strip CRLF: se a chave veio de um editor/terminal Windows, o \r
+# sobrevive ao NR==1{print} do awk (RS so trata \n) e faz o dedup por
+# grep -F falhar (mesma chave com/sem \r sao strings diferentes),
+# duplicando a entrada em authorized_keys a cada rerun.
+NEW_KEY="${NEW_KEY%$'\r'}"
+
 [ -z "$NEW_KEY" ] && die "nenhuma chave fornecida"
 
 # Valida formato basico.
