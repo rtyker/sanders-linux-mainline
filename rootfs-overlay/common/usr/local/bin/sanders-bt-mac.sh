@@ -83,7 +83,13 @@ fi
 # Sem script: btmgmt info levaria 3s timeout e devolveria stdout vazio.
 # Com script: ~50ms.
 btmgmt_run() {
-    script -qc "btmgmt --index 0 $*" /dev/null
+    # printf %q escapa cada argumento pro contexto de shell — $* direto
+    # aqui funcionava so porque os args atuais (palavras fixas, MAC sem
+    # espaco) nunca precisam de escaping; isso evita quebrar se algum
+    # dia um argumento tiver espaco/caractere especial.
+    local args
+    args=$(printf ' %q' "$@")
+    script -qc "btmgmt --index 0$args" /dev/null
 }
 
 current_mac() {

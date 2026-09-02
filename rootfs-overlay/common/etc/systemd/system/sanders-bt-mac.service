@@ -3,10 +3,15 @@ Description=Restore Bluetooth MAC from /persist (sanders)
 # Race condition: o service anterior falhava porque rodava antes do hci0
 # estar 100% pronto. sanders-bt-mac.sh agora espera explicitamente o
 # device aparecer e o btmgmt ficar responsivo (retry interno).
-After=local-fs.target sys-subsystem-bluetooth-devices-hci0.device
+After=local-fs.target sys-subsystem-bluetooth-devices-hci0.device dev-disk-by\x2dpartlabel-persist.device
 Before=bluetooth.service
-Wants=sys-subsystem-bluetooth-devices-hci0.device
+Wants=sys-subsystem-bluetooth-devices-hci0.device dev-disk-by\x2dpartlabel-persist.device
 # So executa se persist existir (senao nao tem MAC pra restaurar).
+# O After=/Wants= no device acima garante que o job so inicia (e so
+# entao avalia esta condition) depois do udev popular o symlink —
+# sem isso, ConditionPathExists podia ser avaliada antes do udev
+# terminar e pular o servico no boot inteiro (Condition* nao e
+# reavaliada depois).
 ConditionPathExists=/dev/disk/by-partlabel/persist
 
 [Service]
