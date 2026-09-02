@@ -63,6 +63,14 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
         -e 's/^#\(pt_BR.UTF-8 UTF-8\)/\1/' \
         -e 's/^#\(en_US.UTF-8 UTF-8\)/\1/' \
         /etc/locale.gen
+    # sed -i nao retorna erro se o padrao simplesmente nao casar (ex.:
+    # formato do locale.gen mudou numa tarball futura) — só confere se
+    # falhar em erro real de arquivo. Verifica que as linhas foram de
+    # fato descomentadas antes de seguir, senao locale-gen roda "com
+    # sucesso" gerando um rootfs sem nenhum dos dois locales.
+    grep -q "^pt_BR.UTF-8 UTF-8" "$MNT/etc/locale.gen" \
+        && grep -q "^en_US.UTF-8 UTF-8" "$MNT/etc/locale.gen" \
+        || warn "sed nao descomentou pt_BR/en_US em /etc/locale.gen — formato do arquivo mudou?"
     arch-chroot "$MNT" locale-gen >/dev/null 2>&1 || warn "locale-gen falhou"
 
     # Pacotes base para os dois flavors.
