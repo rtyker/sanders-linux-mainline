@@ -1,18 +1,23 @@
 [Unit]
 Description=Restore Bluetooth MAC from /persist (sanders)
-# Roda no boot independente do bluetooth.service. Se bluetooth.service
-# vai subir (socket activation ou enable explicito), Before= garante
-# que rodamos primeiro e nao conflitamos pelo socket mgmt do controller.
-# WantedBy=bluetooth.service nao funciona se bluetooth.service estiver
-# disabled (caso default no Arch ARM) — por isso usamos multi-user.target.
+# Race condition: o service anterior falhava porque rodava antes do hci0
+# estar 100% pronto. sanders-bt-mac.sh agora espera explicitamente o
+# device aparecer e o btmgmt ficar responsivo (retry interno).
 After=local-fs.target sys-subsystem-bluetooth-devices-hci0.device
 Before=bluetooth.service
 Wants=sys-subsystem-bluetooth-devices-hci0.device
+# So executa se persist existir (senao nao tem MAC pra restaurar).
 ConditionPathExists=/dev/disk/by-partlabel/persist
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# Pior caso dentro de sanders-bt-mac.sh: 20s esperando hci0/btmgmt +
+# 10s esperando hci0 voltar apos public-addr + 10s de validacao final
+# = ate 40s. TimeoutStartSec (so vale em [Service], NAO em [Unit] —
+# systemd ignora silenciosamente se colocado la, ver git log) com
+# margem de sobra pra nao matar o servico no meio de um boot lento.
+TimeoutStartSec=60
 ExecStart=/usr/local/bin/sanders-bt-mac.sh
 
 [Install]
