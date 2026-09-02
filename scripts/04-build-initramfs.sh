@@ -24,11 +24,13 @@ cp "$BB" "$INITRAMFS_ROOT/bin/busybox"
 chmod +x "$INITRAMFS_ROOT/bin/busybox"
 
 while read -r app; do
+    app="${app%$'\r'}"
     [ -z "$app" ] && continue
     ln -sf busybox "$INITRAMFS_ROOT/bin/$app"
 done < "$REPO/initramfs/busybox-symlinks-bin.txt"
 
 while read -r app; do
+    app="${app%$'\r'}"
     [ -z "$app" ] && continue
     ln -sf ../bin/busybox "$INITRAMFS_ROOT/sbin/$app"
 done < "$REPO/initramfs/busybox-symlinks-sbin.txt"
@@ -51,5 +53,15 @@ if [ -d "$REPO/firmware" ] && ls "$REPO/firmware"/*.* >/dev/null 2>&1; then
 fi
 
 msg "compactando em $OUT/initramfs.cpio.gz..."
-(cd "$INITRAMFS_ROOT" && find . | cpio -o -H newc 2>/dev/null) | gzip -9 > "$OUT/initramfs.cpio.gz"
+# cpio -o imprime a linha "N blocks" informativa no stderr — nao suprime
+# tudo (2>/dev/null escondia isso E erros reais tipo disco cheio ou
+# permissao, deixando um initramfs corrompido passar sem aviso nenhum).
+CPIO_LOG="$(mktemp)"
+trap 'rm -f "$CPIO_LOG"' EXIT
+if ! (cd "$INITRAMFS_ROOT" && find . | cpio -o -H newc) 2>"$CPIO_LOG" \
+    | gzip -9 > "$OUT/initramfs.cpio.gz"; then
+    cat "$CPIO_LOG" >&2
+    die "cpio falhou ao gerar o initramfs"
+fi
+grep -v "^[0-9]* blocks$" "$CPIO_LOG" >&2 || true
 msg "OK: $OUT/initramfs.cpio.gz ($(du -h "$OUT/initramfs.cpio.gz" | cut -f1))"

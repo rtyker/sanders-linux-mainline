@@ -116,6 +116,9 @@ cmd_status() {
 cmd_pulse() {
     # Pisca N vezes e restaura o estado anterior.
     local count="${1:-3}"
+    case "$count" in
+        ''|*[!0-9]*) die "pulse: N precisa ser um numero inteiro (recebido '$count')" ;;
+    esac
     local prev_brightness prev_trigger
 
     prev_brightness=$(current_brightness)

@@ -47,7 +47,10 @@ cmd_wifi() {
         echo "$WPA_TEMPLATE"
         echo ""
         if [ -n "$pass" ]; then
-            wpa_passphrase "$ssid" "$pass"
+            # Senha via stdin, nao como argumento — argumento de processo
+            # fica visivel pra qualquer usuario local via `ps aux`/
+            # /proc/PID/cmdline enquanto o comando roda.
+            echo "$pass" | wpa_passphrase "$ssid"
         else
             # Rede aberta (sem senha)
             cat <<OPENEOF

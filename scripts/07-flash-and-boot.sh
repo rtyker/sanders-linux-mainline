@@ -32,7 +32,21 @@ read -r _
 msg "carregando lk2nd..."
 sudo fastboot boot "$OUT/lk2nd.img"
 
-sleep 3
+# Espera o lk2nd re-enumerar em fastboot (ate ~30s: 15 tentativas de
+# timeout 1s + sleep 1s cada) em vez de um sleep fixo — em hosts/USB
+# mais lentos, 3s fixos podem nao ser suficientes e o proximo
+# "fastboot boot" chega antes do lk2nd estar pronto, falhando
+# silenciosamente (fastboot so fica esperando o device).
+msg "aguardando lk2nd reaparecer em fastboot..."
+# IMPORTANTE: "fastboot getvar" sem device conectado fica bloqueado
+# indefinidamente em "< waiting for any device >" — sem o timeout aqui
+# o loop nunca de fato repete, so trava na 1a tentativa.
+READY=0
+for _ in $(seq 1 15); do
+    sudo timeout 1 fastboot getvar product 2>&1 | grep -qi "product:" && { READY=1; break; }
+    sleep 1
+done
+[ "$READY" -eq 1 ] || warn "lk2nd nao respondeu em 15s, tentando mesmo assim..."
 
 if [ $FLASH -eq 1 ]; then
     cat <<EOF

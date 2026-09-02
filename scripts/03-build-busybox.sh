@@ -14,7 +14,11 @@ if [ ! -d "$BUSYBOX_SRC" ]; then
 fi
 
 cd "$BUSYBOX_SRC"
-make defconfig
+# So gera .config do zero se nao existir — mesmo padrao do
+# 02-build-kernel.sh. "make defconfig" incondicional aqui descartava
+# qualquer tuning manual feito entre builds (ex.: ajustes via
+# `make menuconfig` num rebuild incremental).
+[ -f .config ] || make defconfig
 sed -i 's|^# CONFIG_STATIC is not set|CONFIG_STATIC=y|' .config
 sed -i 's|^CONFIG_TC=y|# CONFIG_TC is not set|' .config
 
