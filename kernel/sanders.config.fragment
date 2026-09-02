@@ -209,5 +209,16 @@ CONFIG_WATCHDOG_CORE=y
 CONFIG_WATCHDOG_SYSFS=y
 CONFIG_QCOM_WDT=y
 
-
-
+# Bateria e Carregador (PMI8950/PMI8996 SMB1360-like + FG)
+# Carregador SMB (Switch-Mode Battery Charger) para PMI8996/PMI8950
+CONFIG_CHARGER_QCOM_SMBCHG=y
+# Fuel gauge (medidor de carga) PMI8996/PMI8950
+CONFIG_BATTERY_QCOM_FG=y
+# Battery manager para integração com power_supply subsystem
+CONFIG_BATTERY_QCOM_BATTMGR=y
+# Power Supply & Battery Fuel Gauge Drivers (PMIC / BQ27xxx)
+CONFIG_POWER_SUPPLY=y
+CONFIG_POWER_SUPPLY_HWMON=y
+CONFIG_BATTERY_BQ27XXX=y
+CONFIG_BATTERY_BQ27XXX_I2C=y
+CONFIG_BATTERY_GENERIC=y
