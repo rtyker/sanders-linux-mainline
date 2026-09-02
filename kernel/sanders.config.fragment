@@ -175,3 +175,32 @@ CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
 CONFIG_BRIDGE=y
 CONFIG_BRIDGE_NETFILTER=y
 CONFIG_VETH=y
+
+# CPU Frequency Scaling & Governors (cpufreq) — Kconfig scaffolding, ja
+# vinha =y por default no defconfig; explicito aqui so por clareza.
+# NAO resolve cpufreq sozinho: falta o driver de clock-controller de CPU
+# (APCS) do msm8953 no mainline (nao existe drivers/clk/qcom/apcs-msm8953.c
+# nem equivalente hoje). Sem isso o cpufreq-dt nao tem em que bindar —
+# ver comentario em dts/msm8953-motorola-sanders.dts. Confirmado ao vivo
+# 2026-09-02: /sys/devices/system/cpu/cpu0/cpufreq/ nao existe.
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_STAT=y
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
+CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+CONFIG_CPU_FREQ_GOV_USERSPACE=y
+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+CONFIG_CPUFREQ_DT=y
+CONFIG_ENERGY_MODEL=y
+
+# Memory Swap & zram (Compressão em RAM para otimização do eMMC)
+CONFIG_SWAP=y
+CONFIG_ZRAM=y
+CONFIG_ZSMALLOC=y
+CONFIG_ZBUD=y
+CONFIG_CRYPTO_LZ4=y
+CONFIG_CRYPTO_ZSTD=y
+
+

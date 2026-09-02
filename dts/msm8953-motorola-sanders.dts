@@ -123,6 +123,24 @@
 		regulator-always-on;
 		regulator-boot-on;
 	};
+
+	/*
+	 * cpufreq NAO wireado de proposito: msm8953 nao tem driver de
+	 * clock-controller de CPU (APCS) no mainline (drivers/clk/qcom/
+	 * so cobre apcs-msm8916.c e apcs-msm8996.c, nao 8953/8976). O
+	 * clock real do Cortex-A53 nao e exposto ao Linux ainda.
+	 *
+	 * Tentativa anterior amarrou &cpuN a GCC_APSS_AHB_CLK (barramento
+	 * AHB da APSS, nao o core clock) com OPPs de 652MHz-2.016GHz —
+	 * tecnicamente errado: esse clock tem teto de 133.33MHz
+	 * (ftbl_apss_ahb_clk_src em drivers/clk/qcom/gcc-msm8953.c),
+	 * ~15x abaixo do topo da tabela. cpufreq-dt bindaria mas
+	 * clk_set_rate() saturaria/falharia, e escalar esse clock por
+	 * engano afeta o barramento de registrador de outros perifericos.
+	 * Revertido em 2026-09-02. Fix real exige escrever/portar um
+	 * driver APCS pro msm8953 — trabalho de bring-up de SoC, nao
+	 * fragmento de devicetree.
+	 */
 };
 
 &hsusb_phy {
@@ -425,3 +443,4 @@
 	vddpa-supply = <&pm8953_l9>;
 	vdddig-supply = <&pm8953_l5>;
 };
+

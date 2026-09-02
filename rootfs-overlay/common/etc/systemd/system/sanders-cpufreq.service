@@ -1,0 +1,17 @@
+[Unit]
+Description=Ajusta CPU Frequency Governor no Boot (schedutil)
+After=multi-user.target
+# msm8953 ainda nao tem cpufreq funcional no mainline (falta driver de
+# clock-controller de CPU/APCS) — sem isso nao existe
+# /sys/devices/system/cpu/cpu0/cpufreq/, e essa condition pula o
+# servico de forma limpa (nao conta como falha/degraded) em vez de
+# falhar todo boot. Remove esta linha quando cpufreq estiver funcional.
+ConditionPathExists=/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanders-cpufreq.sh schedutil
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

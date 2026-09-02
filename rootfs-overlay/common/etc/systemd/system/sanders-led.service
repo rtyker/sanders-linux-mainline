@@ -1,16 +1,15 @@
 [Unit]
 Description=Set notification LED to server status (sanders)
-# Roda apos a rede estar potencialmente disponivel. network-online.target
-# e o ponto ideal — se a rede ainda nao subiu, o LED fica em blink
-# (sinalizando ausencia de rede).
-After=network-online.target
-Wants=network-online.target
+# Nao depende de network-online.target de proposito: esse target fica
+# refem do systemd-networkd-wait-online.service, que hoje falha e atrasa
+# ~2min todo boot (ver ROADMAP_AND_TODOS.md). O script ja checa o estado
+# atual da rede sozinho — rodar cedo so significa reportar "sem rede"
+# corretamente ate a rede subir; o timer associado (sanders-led.timer)
+# reavalia periodicamente e corrige o LED assim que usb0/wlan0 pegarem IP.
+After=local-fs.target
 ConditionPathExists=/sys/class/leds/white:notification
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/sanders-led.sh status
-
-[Install]
-WantedBy=multi-user.target
