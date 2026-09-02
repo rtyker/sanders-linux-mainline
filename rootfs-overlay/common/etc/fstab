@@ -1,0 +1,25 @@
+# /etc/fstab: static file system information.
+#
+# <file system>             <mount point>  <type>  <options>                                <dump> <pass>
+
+# Partição RootFS no eMMC interno (otimizada para eMMC)
+LABEL=rootfs                /              ext4    defaults,noatime,commit=60,errors=remount-ro  0      1
+
+# Diretório temporário em RAM (evita escritas no eMMC pra dados voláteis)
+tmpfs                       /tmp           tmpfs   defaults,noatime,mode=1777,nosuid,nodev,noexec,size=64M 0 0
+
+# /var/log em RAM (evita desgaste do eMMC com logs). Atenção: logs NAO
+# sobrevivem a reboot dessa forma (journal fica volátil mesmo se
+# /var/log/journal existir, já que o diretório é recriado vazio a cada
+# boot). Trade-off aceito em favor de menor desgaste do eMMC.
+tmpfs                       /var/log       tmpfs   defaults,noatime,nosuid,nodev,size=32M  0      0
+
+# Cartão MicroSD (expansão opcional de armazenamento do servidor).
+# Formate o cartão com label SDCARD (ex.: `mkfs.ext4 -L SDCARD /dev/mmcblk1p1`)
+# — usamos só LABEL= aqui porque numeração de /dev/mmcblkN pode variar
+# dependendo de quantos cartões/adaptadores estão plugados; uma segunda
+# linha apontando pro mesmo mountpoint por device NAO é um "fallback"
+# válido em fstab (o systemd-fstab-generator criaria duas unidades de
+# automount competindo pelo mesmo /mnt/microsd).
+# nofail: ignora caso não haja cartão inserido; automount: monta sob demanda.
+LABEL=SDCARD                /mnt/microsd   auto    defaults,nofail,noatime,x-systemd.automount   0      2
