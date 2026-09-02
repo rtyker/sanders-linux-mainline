@@ -209,16 +209,22 @@ CONFIG_WATCHDOG_CORE=y
 CONFIG_WATCHDOG_SYSFS=y
 CONFIG_QCOM_WDT=y
 
-# Bateria e Carregador (PMI8950/PMI8996 SMB1360-like + FG)
-# Carregador SMB (Switch-Mode Battery Charger) para PMI8996/PMI8950
-CONFIG_CHARGER_QCOM_SMBCHG=y
-# Fuel gauge (medidor de carga) PMI8996/PMI8950
-CONFIG_BATTERY_QCOM_FG=y
-# Battery manager para integração com power_supply subsystem
-CONFIG_BATTERY_QCOM_BATTMGR=y
-# Power Supply & Battery Fuel Gauge Drivers (PMIC / BQ27xxx)
+# Bateria e Carregador — NAO existe driver de charger/fuel-gauge
+# mainline pro PMI8950/PMI8996 deste device (verificado 2026-09-02):
+# pmi8950.dtsi upstream so tem VADC/GPIO/MPP/LAB-IBB/PWM/WLED, sem
+# nenhum no de charger/fg; nenhum driver em drivers/power/supply/
+# menciona pmi8950/pmi8996. CONFIG_CHARGER_QCOM_SMBCHG e
+# CONFIG_BATTERY_QCOM_FG nao existem no Kconfig (nomes inventados).
+# CONFIG_BATTERY_QCOM_BATTMGR existe mas e pra outra geracao de
+# hardware (PMIC GLINK dos Snapdragon 8-gen recentes via AUXILIARY_BUS,
+# nao o SPMI direto do PMI8950). Isso e trabalho de bring-up de driver
+# do zero, nao ajuste de devicetree — ver ROADMAP_AND_TODOS.md.
+#
+# Mantido so o que e real e inofensivo (bq27xxx e um fuel-gauge I2C
+# comum, mas sem no de devicetree correspondente hoje ele so fica
+# carregado sem bindar em nada — exatamente o que já foi observado
+# ao vivo no device).
 CONFIG_POWER_SUPPLY=y
 CONFIG_POWER_SUPPLY_HWMON=y
 CONFIG_BATTERY_BQ27XXX=y
 CONFIG_BATTERY_BQ27XXX_I2C=y
-CONFIG_BATTERY_GENERIC=y
