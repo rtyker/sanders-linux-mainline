@@ -38,6 +38,14 @@ msg "extraindo Arch Linux ARM tarball..."
 mount -o loop "$ROOTFS_IMG" "$MNT"
 bsdtar -xpf "$ARCH_TARBALL" -C "$MNT"
 
+# multi-user.target.wants/ ja vem populado na tarball oficial (confirmado:
+# remote-fs.target, systemd-networkd.service, sshd.service), entao os
+# ln -sf mais abaixo funcionam hoje. Mas isso e implicito — garante aqui
+# de forma explicita, caso uma tarball futura venha sem esses symlinks
+# base (o ln -sf pra um diretorio inexistente falha com set -e ativo e
+# derruba o build inteiro).
+mkdir -p "$MNT/etc/systemd/system/multi-user.target.wants"
+
 # Inicializa pacman keyring no rootfs (via arch-chroot + qemu-user binfmt).
 # Sem isso, no primeiro boot o pacman da:
 #   "Public keyring not found; have you run 'pacman-key --init'?"
