@@ -11,6 +11,8 @@ check_cmd ${ARM64_TC}gcc
 check_cmd flex
 check_cmd bison
 check_cmd dtc
+check_cmd ccache
+msg "ccache: CCACHE_DIR=$CCACHE_DIR"
 
 if [ ! -d "$LINUX_SRC" ]; then
     msg "clonando Linux mainline (shallow, branch=$LINUX_BRANCH)..."
@@ -44,18 +46,20 @@ done
 
 if [ ! -f .config ]; then
     msg "make defconfig (arm64)..."
-    make ARCH=arm64 CROSS_COMPILE="$ARM64_TC" defconfig
+    make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" defconfig
 fi
 
 msg "aplicando config fragment do sanders..."
 ./scripts/kconfig/merge_config.sh -m .config "$REPO/kernel/sanders.config.fragment"
-make ARCH=arm64 CROSS_COMPILE="$ARM64_TC" olddefconfig
+make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" olddefconfig
 
 msg "compilando kernel (Image.gz + dtbs)..."
-make ARCH=arm64 CROSS_COMPILE="$ARM64_TC" -j"$(nproc)" Image.gz dtbs
+make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" -j"$(nproc)" Image.gz dtbs
 
 KERNEL="$LINUX_SRC/arch/arm64/boot/Image.gz"
 DTB="$LINUX_SRC/arch/arm64/boot/dts/qcom/$DTS_NAME.dtb"
 msg "OK:"
 msg "  $KERNEL ($(du -h "$KERNEL" | cut -f1))"
 msg "  $DTB ($(du -h "$DTB" | cut -f1))"
+msg "ccache stats:"
+ccache -s

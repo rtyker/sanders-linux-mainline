@@ -39,6 +39,29 @@ ARCH_TARBALL_URL="http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.
 ARM32_TC="arm-none-eabi-"
 ARM64_TC="aarch64-linux-gnu-"
 
+# ccache: a arvore do kernel e clonada fresca (git clone --depth=1) toda
+# vez que $BUILD/linux nao existe (rebuild limpo) — sem ccache isso
+# recompila TUDO do zero, porque o incremental do make e baseado em
+# mtime/arvore de objetos que nao sobrevive a um clone novo. ccache
+# cacheia pelo hash do fonte pre-processado, entao sobrevive a clones
+# novos e a "make clean". Aponta por padrao pro diretorio de cache ja
+# provisionado no projeto pai (cache_ccache_aarch64/, max_size=5G
+# configurado la); ajustavel via CCACHE_DIR se este submodulo for
+# clonado isolado em outro lugar (sem esse diretorio sibling).
+CCACHE_DIR="${CCACHE_DIR:-$REPO/../cache_ccache_aarch64}"
+export CCACHE_DIR
+mkdir -p "$CCACHE_DIR"
+
+# Prefixo de CROSS_COMPILE com ccache. O truque de por "ccache " na
+# frente (com espaco) funciona porque o Makefile do kernel invoca
+# "$(CROSS_COMPILE)gcc" — o shell que roda a receita faz word-splitting
+# nisso, entao "ccache aarch64-linux-gnu-gcc ..." vira dois argumentos
+# (comando ccache + o gcc de verdade), nao um binario literal chamado
+# "ccache aarch64-linux-gnu-gcc". Padrao usado por builds de kernel em
+# geral pra isso. Use $ARM64_CC no lugar de "$ARM64_TC" em CROSS_COMPILE=
+# nas chamadas de make dos scripts de build.
+ARM64_CC="ccache $ARM64_TC"
+
 # Offsets Android boot.img para msm8953 Motorola
 BOOT_BASE="0x80000000"
 BOOT_KERNEL_OFFSET="0x00008000"
