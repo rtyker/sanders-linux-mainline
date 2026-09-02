@@ -166,6 +166,94 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 
 ---
 
+## 🧨 Bugs adicionais revalidados (não cobertos pela reindexação de 12 itens)
+
+> A reindexação de 12 bugs acima omitiu vários achados reais da auditoria v1 (que
+> registrava até 56 itens). Foi feita nova verificação contra o código atual em
+> **2026-09-02** e os itens que **continuam abertos** são reincorporados aqui. Itens v1 que
+> já foram corrigidos em commits recentes **não** são repetidos (estão resolvidos). Status:
+> 🟠 Alta / 🟡 Média / 🔵 Baixa / 🔄 Aceito (design).
+
+### 🟠 BUG-A1: `CONFIG_I2C`/`CONFIG_I2C_QUP` não explicitados no fragment
+- **Arquivo:** `kernel/sanders.config.fragment`
+- **Gravidade:** 🟠 Alta (dependência condicional)
+- **Status:** Aberto
+- **Descrição:** O fragment habilita `CONFIG_TOUCHSCREEN_EDT_FT5X06=y` (i2c_3 @0x38) e
+  `CONFIG_LTR501=y` (i2c_7 @0x23), **mas não força `CONFIG_I2C`/`CONFIG_I2C_QUP` builtin**
+  (grep confirma: ausente do arquivo). Mesmo raciocínio do `CONFIG_PHY_QCOM_QUSB2` (forçar
+  `=y` porque não há modprobe no initramfs) deveria valer pro I2C. **Nota:** o `defconfig`
+  arm64 usual já traz `CONFIG_I2C=y`/`CONFIG_I2C_QUP=y`, então pode já estar OK — **a
+  confirmar no `.config` real do build** (ex.: `grep -E 'CONFIG_(I2C|I2C_QUP)=' build/linux/.config`).
+
+### 🟡 BUG-A2: `mkswap`/`swapon` incondicionais após cadeia `zramctl` (`sanders-zram.sh`)
+- **Arquivo:** `rootfs-overlay/common/usr/local/bin/sanders-zram.sh:24-34`
+- **Gravidade:** 🟡 Média
+- **Status:** Aberto
+- **Descrição:** a cadeia `zramctl ... || zramctl ... || zramctl ...` seguida de `mkswap`/
+  `swapon` rodam **incondicionalmente**. Se **todos** os `zramctl` falharem, `mkswap` tenta
+  em `/dev/zram0` inexistente (sob `set -euo pipefail` isso mata o script, sem mensagem
+  clara). Além disso, `--algorithm` só existe em `zramctl` >= 2.39 (tem fallback sem flag,
+  então mitigado). **Melhorar:** checar retorno da cadeia antes do `mkswap`.
+
+### 🟡 BUG-A3: timesync imprime "Relógio ajustado" mesmo se sync não confirmou (`sanders-timesync.sh`)
+- **Arquivo:** `rootfs-overlay/common/usr/local/bin/sanders-timesync.sh:33`
+- **Gravidade:** 🟡 Média (mensagem enganosa)
+- **Status:** Aberto
+- **Descrição:** o loop espera até 15s por `System clock synchronized: yes`; se não
+  confirmar em 15s, **ainda** imprime `Relógio ajustado: $NOW`. O caminho de erro
+  ("inalcançáveis") só cobre quando o DNS nunca resolveu. **Sugestão:** flag de sucesso do
+  `SYNCED` para só imprimir sucesso de fato.
+
+### 🔵 BUG-A4: parsing frágil de `timedatectl` no timesync
+- **Arquivo:** `sanders-timesync.sh:28`
+- **Gravidade:** 🔵 Baixa
+- **Status:** Aberto
+- **Descrição:** procura string exata `System clock synchronized: yes`; formato pode
+  variar entre versões do systemd.
+
+### 🔵 BUG-A5: `01-build-lk2nd.sh` clona completo (sem `--depth=1`) e usa fallback HEAD
+- **Arquivo:** `scripts/01-build-lk2nd.sh:10,14`
+- **Gravidade:** 🔵 Baixa (desempenho/robustez)
+- **Status:** Aberto
+- **Descrição:** `git clone` sem shallow; e se o commit `c8b47cd` não existir, `warn` mas
+  continua com HEAD → build não testado. **Nota:** já avisa via `warn` (mitigado).
+
+### 🔵 BUG-A6: `lib.sh` cmdline `earlycon` sem MMIO
+- **Arquivo:** `scripts/lib.sh:73`
+- **Gravidade:** 🔵 Baixa
+- **Status:** Aberto
+- **Descrição:** `earlycon` simples depende do console configurado; pode falhar
+  silenciosamente no early boot.
+
+### 🔵 BUG-A7: `msm8953-motorola-sanders.dts` — `ts_reset` pinctrl definido mas não referenciado
+- **Arquivo:** `dts/msm8953-motorola-sanders.dts:413`
+- **Gravidade:** 🔵 Baixa
+- **Status:** 🔄 Aceito (design intencional) — o reset do touchscreen foi movido para
+  `gpio-hog` (sempre HIGH) porque o pulse curto do driver causava `-ETIMEDOUT` (comentado
+  no DTS). O pinctrl `ts-reset-state` ficou como código morto/documentação.
+
+### 🔵 BUG-A8: gap de numeração de patches (0001, 0002, 0004 — sem 0003)
+- **Arquivo:** `kernel/`
+- **Gravidade:** 🔵 Baixa (cosmético)
+- **Status:** Aberto
+- **Descrição:** há 0001, 0002 e 0004; `02-build-kernel.sh` itera `000[0-9]*` então não
+  quebra, mas o gap confunde.
+
+### 🔄 BUG-A9: `sanders-bt-mac.sh` — `set +e` global nunca restaurado
+- **Arquivo:** `rootfs-overlay/common/usr/local/bin/sanders-bt-mac.sh:95`
+- **Gravidade:** 🟡 Média
+- **Status:** 🔄 Aceito (design) — todos os paths de saída usam `exit` explícito e há
+  validação final com retry; falhas em `power off`/`public-addr`/`power on` são ignoradas
+  propositalmente (btmgmt às vezes reporta erro mesmo aplicando). Não quebra o fluxo.
+
+### 🔵 BUG-A10: `09-extract-firmware.sh` — path do stock zip ainda com fallback hardcoded
+- **Arquivo:** `scripts/09-extract-firmware.sh:20-24`
+- **Gravidade:** 🔵 Baixa
+- **Status:** Aberto (parcialmente mitigado) — suporta override via `STOCK_ZIP` env, mas o
+  fallback default ainda é `/mnt/hdauxiliar/android/projeto_g5/stock/*.zip` (máquina do dev).
+
+---
+
 ## 📊 Matriz Consolidada de Bugs e Gravidades
 
 | ID | Componente | Descrição Resumida | Gravidade | Estado |
