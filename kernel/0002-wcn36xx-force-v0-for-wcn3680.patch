@@ -1,7 +1,8 @@
 diff --git a/drivers/net/wireless/ath/wcn36xx/smd.c b/drivers/net/wireless/ath/wcn36xx/smd.c
+index 813553edc..5211b62fa 100644
 --- a/drivers/net/wireless/ath/wcn36xx/smd.c
 +++ b/drivers/net/wireless/ath/wcn36xx/smd.c
-@@ -1562,7 +1562,10 @@ int wcn36xx_smd_config_sta(struct wcn36xx *wcn, struct ieee80211_vif *vif,
+@@ -1501,7 +1501,10 @@ int wcn36xx_smd_config_sta(struct wcn36xx *wcn, struct ieee80211_vif *vif,
  
  	mutex_lock(&wcn->hal_mutex);
  
@@ -13,7 +14,7 @@ diff --git a/drivers/net/wireless/ath/wcn36xx/smd.c b/drivers/net/wireless/ath/w
  		ret = wcn36xx_smd_config_sta_v1(wcn, vif, sta);
  	else
  		ret = wcn36xx_smd_config_sta_v0(wcn, vif, sta);
-@@ -1889,7 +1889,10 @@ int wcn36xx_smd_config_bss(struct wcn36xx *wcn, struct ieee80211_vif *vif,
+@@ -1828,7 +1831,10 @@ int wcn36xx_smd_config_bss(struct wcn36xx *wcn, struct ieee80211_vif *vif,
  
  	mutex_lock(&wcn->hal_mutex);
  
