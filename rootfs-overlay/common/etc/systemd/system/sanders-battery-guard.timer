@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer para monitoramento e proteção da bateria (a cada 2 min)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

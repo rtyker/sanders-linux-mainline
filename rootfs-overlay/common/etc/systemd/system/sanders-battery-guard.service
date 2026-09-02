@@ -1,0 +1,7 @@
+[Unit]
+Description=Proteção de Carga de Bateria (Limite 80% / Histerese 70%)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanders-battery-guard.sh
