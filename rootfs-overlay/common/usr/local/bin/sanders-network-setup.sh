@@ -7,10 +7,18 @@
 #   3) Status: mostra interfaces, IPs e estado da conexão.
 #
 # Uso:
-#   sanders-network-setup.sh wifi <SSID> <senha>    # Configura Wi-Fi
+#   sanders-network-setup.sh wifi <SSID> <senha>    # Configura Wi-Fi (senha no argv — ver aviso abaixo)
+#   sanders-network-setup.sh wifi <SSID> -          # Configura Wi-Fi, pede a senha via prompt seguro (recomendado)
+#   sanders-network-setup.sh wifi <SSID>            # Rede aberta, sem senha
 #   sanders-network-setup.sh wifi-clear              # Remove config Wi-Fi
 #   sanders-network-setup.sh status                  # Mostra estado da rede
 #   sanders-network-setup.sh usb-status              # Detecta adaptador USB Ethernet
+#
+# AVISO: passar a senha como 3o argumento a deixa visivel em
+# /proc/$PID/cmdline (e em qualquer `ps aux`) pra qualquer usuario
+# local enquanto o comando roda — mesmo que o script internamente so
+# repasse a senha pro wpa_passphrase via stdin. Use "-" no lugar da
+# senha pra digitar num prompt oculto (nunca toca argv/journal).
 
 set -euo pipefail
 
@@ -28,7 +36,16 @@ cmd_wifi() {
     local pass="${2:-}"
 
     if [ -z "$ssid" ]; then
-        err "Uso: $0 wifi <SSID> <senha>"
+        err "Uso: $0 wifi <SSID> [senha|-]"
+    fi
+
+    # "-" no lugar da senha: le num prompt oculto (read -s), nunca passa
+    # pelo argv do processo. Unica forma de configurar WPA sem deixar a
+    # senha visivel em /proc/$PID/cmdline durante a execucao.
+    if [ "$pass" = "-" ]; then
+        printf 'Senha da rede "%s": ' "$ssid" >&2
+        read -rs pass
+        echo >&2
     fi
 
     # Valida que wpa_supplicant esta instalado
@@ -265,9 +282,11 @@ case "${1:-status}" in
     status)     cmd_status ;;
     usb-status) cmd_usb_status ;;
     *)
-        echo "Uso: $0 {wifi <SSID> [senha] | wifi-clear | status | usb-status}"
+        echo "Uso: $0 {wifi <SSID> [senha|-] | wifi-clear | status | usb-status}"
         echo ""
-        echo "  wifi <SSID> [senha]  Configura Wi-Fi (salva em wpa_supplicant)"
+        echo "  wifi <SSID> [senha|-]  Configura Wi-Fi (salva em wpa_supplicant)."
+        echo "                         Use \"-\" pra digitar a senha num prompt oculto"
+        echo "                         em vez de passar como argumento visivel."
         echo "  wifi-clear           Remove config Wi-Fi"
         echo "  status               Mostra estado de todas as interfaces"
         echo "  usb-status           Detecta adaptador USB Ethernet (OTG mode)"

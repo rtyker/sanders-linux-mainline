@@ -80,15 +80,11 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 
 ---
 
-### 🟡 BUG-005: Exposição de Senha em Tabela de Processos via Pipe (`wpa_passphrase`)
+### ✅ BUG-005: Exposição de Senha em Tabela de Processos via Pipe (`wpa_passphrase`)
 - **Arquivo:** [`rootfs-overlay/common/usr/local/bin/sanders-network-setup.sh`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/rootfs-overlay/common/usr/local/bin/sanders-network-setup.sh#L53)
 - **Gravidade:** 🟡 **Média (Segurança)**
-- **Sintoma:** A senha da rede Wi-Fi fornecida como parâmetro para o script pode ser capturada por usuários não-privilegiados monitorando a árvore de processos.
-- **Causa Raiz:**
-  ```bash
-  echo "$pass" | wpa_passphrase "$ssid"
-  ```
-  Embora passar a senha via pipe `echo` previna que ela apareça na linha de comando do `wpa_passphrase`, a variável `$pass` é recebida como o segundo argumento do próprio script `sanders-network-setup.sh wifi <SSID> <senha>`, permanecendo visível no `/proc/$PID/cmdline` de qualquer usuário durante a execução do comando.
+- **Status:** ✅ **Corrigido 2026-09-02.** Achado real e mais fundo do que a correção anterior desta mesma sessão cobria: eu já tinha trocado `wpa_passphrase "$ssid" "$pass"` por `echo "$pass" | wpa_passphrase "$ssid"`, mas isso só evita a senha aparecer no argv do *subprocesso* `wpa_passphrase` — a variável `$pass` continua vindo como argumento do próprio `sanders-network-setup.sh wifi <SSID> <senha>`, visível em `/proc/$PID/cmdline` enquanto o script roda.
+- **Correção:** adicionado suporte a `wifi <SSID> -` — o `-` no lugar da senha faz o script pedir via `read -rs` (prompt oculto, nunca toca argv/journal). Documentado no uso/ajuda como forma recomendada; a forma antiga (senha como argumento) continua funcionando por compatibilidade, mas com aviso explícito no cabeçalho do script sobre a exposição.
 
 ---
 
@@ -129,12 +125,11 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 
 ## 4. 🐕 Kernel, Drivers e Hardware Watchdog
 
-### 🟠 BUG-009: Risco de Reinício Forçado do SoC Durante o Estado de Suspensão (`s2idle`)
+### ✅ BUG-009: Risco de Reinício Forçado do SoC Durante o Estado de Suspensão (`s2idle`)
 - **Arquivo:** [`rootfs-overlay/common/etc/systemd/system.conf.d/10-watchdog.conf`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/rootfs-overlay/common/etc/systemd/system.conf.d/10-watchdog.conf) / [`kernel/sanders.config.fragment`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/kernel/sanders.config.fragment#L206-L210)
 - **Gravidade:** 🟠 **Alta (Estabilidade em Suspend)**
-- **Sintoma:** O dispositivo reinicia sozinho após passar exatamente 30 segundos em modo de economia de energia (`s2idle` / suspend-to-RAM).
-- **Causa Raiz:** O driver `qcom-wdt` ativa o registrador do temporizador de hardware da Qualcomm (`0x0b017000`). O `systemd` gerencia a alimentação periódica do watchdog via `RuntimeWatchdogSec=30s`. Quando o Linux entra em suspensão profunda (`s2idle`), a CPU congela a execução de todos os processos userspace (incluindo o systemd). Se o contador de hardware da Qualcomm continuar rodando no PMIC sem ser pingado durante a suspensão, o hardware dispara um reset físico do chip em 30s.
-- **Solução Recomendada para o Futuro:** Implementar hook no Power Management (`PM_SUSPEND_PREPARE`) para desabilitar o temporizador de hardware antes do suspend.
+- **Status:** ✅ **Corrigido — confirmado AO VIVO em 2026-09-02.** Esta tabela dizia "Documentado" mas o fix já existe (`rootfs-overlay/common/etc/systemd/sleep.conf.d/10-disable-sleep.conf`, `AllowSuspend=no` e afins) e testei direto no device recém-flashado: `systemctl suspend` retorna `Call to Suspend failed: Sleep verb 'suspend' is disabled by config` (exit 1). Bloqueado na raiz — nenhum caminho pra suspend (botão de power, bateria fraca, comando manual) funciona, então o cenário do watchdog nunca chega a acontecer.
+- **Causa Raiz (histórica):** O driver `qcom-wdt` ativa o registrador do temporizador de hardware da Qualcomm (`0x0b017000`). O `systemd` gerencia a alimentação periódica do watchdog via `RuntimeWatchdogSec=30s`. Quando o Linux entra em suspensão profunda (`s2idle`), a CPU congela a execução de todos os processos userspace (incluindo o systemd). Se o contador de hardware da Qualcomm continuar rodando no PMIC sem ser pingado durante a suspensão, o hardware dispara um reset físico do chip em 30s.
 
 ---
 
@@ -179,15 +174,31 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 | **BUG-002** | `sanders-battery-guard.sh` | Loop de log inútil em modo descarregamento (`STATUS != Charging`) | 🔵 Baixa | ✅ **Corrigido** (2026-09-02) |
 | **BUG-003** | DT / Kconfig PMI8996 | Charger e Fuel Gauge sem drivers C no kernel mainline | 🟠 Alta | Mapeado (Scaffolding) |
 | **BUG-004** | `sanders-network-setup.sh` | Regex `/^[0-9]+:/` incorreta para parsing de `/proc/net/dev` | 🔴 Crítica | ✅ **Corrigido** (2026-09-02) |
-| **BUG-005** | `sanders-network-setup.sh` | Exposição de senha Wi-Fi em tabela de processos via `echo` | 🟡 Média | Documentado |
+| **BUG-005** | `sanders-network-setup.sh` | Exposição de senha Wi-Fi em tabela de processos via `echo` | 🟡 Média | ✅ **Corrigido** (2026-09-02) — `wifi <SSID> -` pede senha via prompt oculto |
 | **BUG-006** | `wcn36xx` Patch 0002 | Limitação de throughput Wi-Fi a taxas HT (802.11n) sem VHT | 🔵 Baixa | Decisão / Fix |
 | **BUG-007** | `sanders-bt-mac.sh` | Falha de resolução do symlink `/dev/disk/by-partlabel/persist` | 🟠 Alta | ✅ **Corrigido** (2026-09-02) |
 | **BUG-008** | `sanders-bt-mac.service` | Race condition de D-Bus entre `btmgmt` e `bluetoothd` | 🟡 Média | Documentado |
-| **BUG-009** | `qcom-wdt` / Systemd | Reset forçado do SoC durante o modo de suspensão de energia (`s2idle`) | 🟠 Alta | Documentado |
+| **BUG-009** | `qcom-wdt` / Systemd | Reset forçado do SoC durante o modo de suspensão de energia (`s2idle`) | 🟠 Alta | ✅ **Corrigido, confirmado ao vivo** (2026-09-02) |
 | **BUG-010** | Kconfig / DT APCS | Ausência de driver APCS impede funcionamento do `cpufreq-dt` | 🟡 Média | Mapeado (Scaffolding) |
 | **BUG-011** | `sanders-timesync.sh` | Bloqueio por timeout se resolução DNS via `getent` for lenta | 🟡 Média | Documentado |
 | **BUG-012** | `sanders-server-setup.sh` | Risco de *partial upgrade* no Arch Linux ao usar `pacman -Sy` | 🟡 Média | ✅ **Corrigido** (2026-09-02) |
 
 ---
-*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02.*
+
+## ✅ Verificação ao vivo pós-flash (Claude, 2026-09-02)
+
+Depois de um reflash da rootfs (corrigiu uma corrupção ext4 não relacionada a este documento) e boot real via `07-boot-kernel.sh`, testei o que dava pra testar direto no device — não só lido, rodado:
+
+- **BUG-009 (watchdog+suspend):** confirmado corrigido — `systemctl suspend` recusa (ver acima).
+- **Watchdog:** `/dev/watchdog` e `/dev/watchdog0` existem.
+- **SSH hardening:** `permitrootlogin prohibit-password`, `passwordauthentication no`, `kbdinteractiveauthentication no` (nome novo da diretiva).
+- **zram:** `/dev/zram0` ativo como swap.
+- **Telemetria térmica:** 9 zonas lendo valores sãos.
+- **LED de status:** detecta rede corretamente.
+- **cpufreq:** confirmado ainda não-funcional (BUG-010) — esperado, sem regressão.
+- Corrigido também: BUG-004 e BUG-007 confirmados intactos no código; BUG-005 corrigido nesta sessão (prompt oculto pra senha Wi-Fi); BUG-012 (`pacman -Syu`) confirmado nos 3 pontos do código.
+- **Não testado neste boot:** Docker, restauração de MAC do Bluetooth, fonte do console (`vconsole`) — o build usado não tinha os pacotes extras instalados (docker, bluez-utils, terminus-font). Não é regressão de nenhum fix desta sessão, é ausência de pacote; revalidar quando esses pacotes forem instalados.
+
+---
+*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02. Verificação ao vivo e correção do BUG-005 por Claude em 2026-09-02 (ver seção acima).*
 
