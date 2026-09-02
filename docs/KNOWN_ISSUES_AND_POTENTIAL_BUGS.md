@@ -288,5 +288,5 @@ Depois de um reflash da rootfs (corrigiu uma corrupção ext4 não relacionada a
 - **Não testado neste boot:** Docker, restauração de MAC do Bluetooth, fonte do console (`vconsole`) — o build usado não tinha os pacotes extras instalados (docker, bluez-utils, terminus-font). Não é regressão de nenhum fix desta sessão, é ausência de pacote; revalidar quando esses pacotes forem instalados.
 
 ---
-*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02. Verificação ao vivo e correção do BUG-005 por Claude em 2026-09-02 (ver seção acima).*
+*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02. Verificação ao vivo e correção do BUG-005 por Claude em 2026-09-02. Revisão adicional em 2026-09-02: reincorporação dos itens abertos (BUG-A1..A10) omitidos pela reindexação de 12 itens, com estado validado contra o código real. Nenhum fonte foi modificado nesta revisão — apenas este documento.*
 
