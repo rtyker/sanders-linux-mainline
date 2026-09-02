@@ -101,16 +101,20 @@ cmd_status() {
     echo "--- Interfaces ---"
     awk '
     BEGIN { count=0 }
-    /^[0-9]+:/ {
-        iface = $2
+    /^[ ]*[a-zA-Z0-9_-]+:/ {
+        iface = $1
         sub(/:.*/, "", iface)
-        flags = $0
-        state = (flags ~ /UP/) ? "UP" : "DOWN"
-        printf "  %-12s  %s\n", iface, state
+        if (iface == "lo") next
+        cmd = "cat /sys/class/net/" iface "/operstate 2>/dev/null"
+        cmd | getline state
+        close(cmd)
+        if (state == "") state = "unknown"
+        printf "  %-12s  %s\n", iface, toupper(state)
         count++
     }
     END { if (count == 0) print "  (nenhuma interface encontrada)" }
     ' /proc/net/dev
+
     echo ""
 
     # USB OTG Ethernet

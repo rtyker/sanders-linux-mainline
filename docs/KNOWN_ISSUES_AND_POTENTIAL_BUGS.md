@@ -175,18 +175,19 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 
 | ID | Componente | Descrição Resumida | Gravidade | Estado |
 |---|---|---|:---:|:---:|
-| **BUG-001** | `sanders-battery-guard.sh` | Falha de sintaxe bash se `capacity` sysfs retornar string vazia | 🟡 Média | Documentado |
-| **BUG-002** | `sanders-battery-guard.sh` | Loop de log inútil em modo descarregamento (`STATUS != Charging`) | 🔵 Baixa | Documentado |
-| **BUG-003** | DT / Kconfig PMI8996 | Charger e Fuel Gauge sem drivers C no kernel mainline | 🟠 Alta | Mapeado |
-| **BUG-004** | `sanders-network-setup.sh` | Regex `/^[0-9]+:/` incorreta para parsing de `/proc/net/dev` | 🔴 Crítica | Documentado |
+| **BUG-001** | `sanders-battery-guard.sh` | Falha de sintaxe bash se `capacity` sysfs retornar string vazia | 🟡 Média | ✅ **Corrigido** (2026-09-02) |
+| **BUG-002** | `sanders-battery-guard.sh` | Loop de log inútil em modo descarregamento (`STATUS != Charging`) | 🔵 Baixa | ✅ **Corrigido** (2026-09-02) |
+| **BUG-003** | DT / Kconfig PMI8996 | Charger e Fuel Gauge sem drivers C no kernel mainline | 🟠 Alta | Mapeado (Scaffolding) |
+| **BUG-004** | `sanders-network-setup.sh` | Regex `/^[0-9]+:/` incorreta para parsing de `/proc/net/dev` | 🔴 Crítica | ✅ **Corrigido** (2026-09-02) |
 | **BUG-005** | `sanders-network-setup.sh` | Exposição de senha Wi-Fi em tabela de processos via `echo` | 🟡 Média | Documentado |
 | **BUG-006** | `wcn36xx` Patch 0002 | Limitação de throughput Wi-Fi a taxas HT (802.11n) sem VHT | 🔵 Baixa | Decisão / Fix |
-| **BUG-007** | `sanders-bt-mac.sh` | Falha de resolução do symlink `/dev/disk/by-partlabel/persist` | 🟠 Alta | Documentado |
+| **BUG-007** | `sanders-bt-mac.sh` | Falha de resolução do symlink `/dev/disk/by-partlabel/persist` | 🟠 Alta | ✅ **Corrigido** (2026-09-02) |
 | **BUG-008** | `sanders-bt-mac.service` | Race condition de D-Bus entre `btmgmt` e `bluetoothd` | 🟡 Média | Documentado |
 | **BUG-009** | `qcom-wdt` / Systemd | Reset forçado do SoC durante o modo de suspensão de energia (`s2idle`) | 🟠 Alta | Documentado |
-| **BUG-010** | Kconfig / DT APCS | Ausência de driver APCS impede funcionamento do `cpufreq-dt` | 🟡 Média | Mapeado |
+| **BUG-010** | Kconfig / DT APCS | Ausência de driver APCS impede funcionamento do `cpufreq-dt` | 🟡 Média | Mapeado (Scaffolding) |
 | **BUG-011** | `sanders-timesync.sh` | Bloqueio por timeout se resolução DNS via `getent` for lenta | 🟡 Média | Documentado |
-| **BUG-012** | `sanders-server-setup.sh` | Risco de *partial upgrade* no Arch Linux ao usar `pacman -Sy` | 🟡 Média | Documentado |
+| **BUG-012** | `sanders-server-setup.sh` | Risco de *partial upgrade* no Arch Linux ao usar `pacman -Sy` | 🟡 Média | ✅ **Corrigido** (2026-09-02) |
 
 ---
-*Relatório de auditoria técnica enriquecido e revisado pelo Antigravity em 2026-09-02.*
+*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02.*
+

@@ -15,7 +15,6 @@
 
 set -e
 
-PERSIST_DEV="/dev/disk/by-partlabel/persist"
 NV_FILE_REL="bluetooth/.bt_nv.bin"
 MOUNT="/run/sanders-persist"
 
@@ -27,10 +26,24 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [ ! -e "$PERSIST_DEV" ]; then
-    echo "sanders-bt-mac: persist partition $PERSIST_DEV not found, skipping" >&2
+PERSIST_DEV=""
+for _ in $(seq 1 10); do
+    if [ -e "/dev/disk/by-partlabel/persist" ]; then
+        PERSIST_DEV="/dev/disk/by-partlabel/persist"
+        break
+    elif [ -e "/dev/mmcblk0p11" ]; then
+        PERSIST_DEV="/dev/mmcblk0p11"
+        break
+    fi
+    sleep 1
+done
+
+if [ -z "$PERSIST_DEV" ]; then
+    echo "sanders-bt-mac: persist partition not found, skipping" >&2
     exit 0
 fi
+
+
 
 mkdir -p "$MOUNT"
 mount -o ro "$PERSIST_DEV" "$MOUNT" || {
