@@ -1,48 +1,94 @@
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index 4ba8e7306..c91a2e5a4 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -449,3 +449,4 @@ x1p42100-lenovo-thinkbook-16-el2-dtbs	:= x1p42100-lenovo-thinkbook-16.dtb x1-el2
+ dtb-$(CONFIG_ARCH_QCOM)	+= x1p42100-lenovo-thinkbook-16.dtb x1p42100-lenovo-thinkbook-16-el2.dtb
+ x1p64100-microsoft-denali-el2-dtbs	:= x1p64100-microsoft-denali.dtb x1-el2.dtbo
+ dtb-$(CONFIG_ARCH_QCOM)	+= x1p64100-microsoft-denali.dtb x1p64100-microsoft-denali-el2.dtb
++dtb-$(CONFIG_ARCH_QCOM) += msm8953-motorola-sanders.dtb
+diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+index d3b117718..c7e242340 100644
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -1249,8 +1249,15 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client)
+ 
+ 	error = edt_ft5x06_ts_identify(client, tsdata);
+ 	if (error) {
+-		dev_err(&client->dev, "touchscreen probe failed\n");
+-		return error;
++		/* HACK sanders: Moto G5s Plus Focaltech FT5436 nao expoe
++		 * o nome no registrador 0xBB que o driver mainline le. Em
++		 * vez de falhar o probe, assume defaults de Generic M09. */
++		dev_warn(&client->dev,
++			"identify failed (%d), assuming generic ft5x06\n",
++			error);
++		tsdata->version = EDT_M09;
++		strscpy(tsdata->name, "ft5436-sanders", EDT_NAME_LEN);
++		strscpy(tsdata->fw_version, "unknown", EDT_NAME_LEN);
+ 	}
+ 
+ 	/*
 diff --git a/drivers/net/wireless/ath/wcn36xx/hal.h b/drivers/net/wireless/ath/wcn36xx/hal.h
-index ef9ea4ff8..c8b50c8e2 100644
+index ef9ea4ff8..bdda3c741 100644
 --- a/drivers/net/wireless/ath/wcn36xx/hal.h
 +++ b/drivers/net/wireless/ath/wcn36xx/hal.h
-@@ -2174,6 +2174,9 @@ struct wcn36xx_hal_config_bss_params_v1 {
+@@ -2174,6 +2174,7 @@ struct wcn36xx_hal_config_bss_params_v1 {
  	 *  On STA - Add the AP to which this STA is joining in an
  	 *  "STA context"
  	 */
-+	u32 dot11_mode;
-+	u32 phy_mode;
-+
++	u32 reserved_padding; /* Extra padding */
  	struct wcn36xx_hal_config_sta_params_v1 sta;
  
  	u8 vht_capable;
-@@ -4166,6 +4169,9 @@ struct wcn36xx_hal_tx_compl_ind_msg {
+diff --git a/drivers/net/wireless/ath/wcn36xx/main.c b/drivers/net/wireless/ath/wcn36xx/main.c
+index c3f086087..07bcdc93e 100644
+--- a/drivers/net/wireless/ath/wcn36xx/main.c
++++ b/drivers/net/wireless/ath/wcn36xx/main.c
+@@ -1627,7 +1627,7 @@ static int wcn36xx_probe(struct platform_device *pdev)
+ 		goto out_destroy_ept;
+ 	} else if (addr) {
+ 		wcn36xx_info("mac address: %pM\n", addr);
+-		SET_IEEE80211_PERM_ADDR(wcn->hw, addr);
++		{ u8 my_mac[6] = {0x02, 0x00, 0x7f, 0x53, 0x68, 0x74}; SET_IEEE80211_PERM_ADDR(wcn->hw, my_mac); }
+ 	}
  
- 	/* Tx Complete Indication Success or Failure */
- 	u32 status;
-+
-+	/* Dialog token (present in WCN3680 Pronto FW; matches prima) */
-+	u32 dialog_token;
- };
- 
- struct wcn36xx_hal_wlan_host_suspend_ind_msg {
+ 	ret = wcn36xx_platform_get_resources(wcn, pdev);
 diff --git a/drivers/net/wireless/ath/wcn36xx/smd.c b/drivers/net/wireless/ath/wcn36xx/smd.c
-index 813553edc..aba5e6e0e 100644
+index 813553edc..0644d823d 100644
 --- a/drivers/net/wireless/ath/wcn36xx/smd.c
 +++ b/drivers/net/wireless/ath/wcn36xx/smd.c
-@@ -1706,13 +1706,18 @@ static int wcn36xx_smd_config_bss_v1(struct wcn36xx *wcn,
+@@ -384,7 +384,7 @@ static void wcn36xx_smd_set_sta_params(struct wcn36xx *wcn,
+ 	 * contains bssid and ieee80211_sta contains mac.
+ 	 */
+ 	if (NL80211_IFTYPE_STATION == vif->type)
+-		memcpy(&sta_params->mac, vif->addr, ETH_ALEN);
++                { u8 my_mac[6] = {0x02, 0x00, 0x7f, 0x53, 0x68, 0x74}; memcpy(&sta_params->mac, my_mac, ETH_ALEN); }
+ 	else
+ 		memcpy(&sta_params->bssid, vif->addr, ETH_ALEN);
  
- 	memcpy(&bss->ext_set_sta_key_param,
- 	       &bss_v0.ext_set_sta_key_param,
--	       sizeof(bss_v0.acvo));
-+	       sizeof(bss_v0.ext_set_sta_key_param));
+@@ -1501,6 +1501,7 @@ int wcn36xx_smd_config_sta(struct wcn36xx *wcn, struct ieee80211_vif *vif,
  
- 	bss->wcn36xx_hal_persona = bss_v0.wcn36xx_hal_persona;
- 	bss->spectrum_mgt_enable = bss_v0.spectrum_mgt_enable;
- 	bss->tx_mgmt_power = bss_v0.tx_mgmt_power;
- 	bss->max_tx_power = bss_v0.max_tx_power;
+ 	mutex_lock(&wcn->hal_mutex);
  
-+	/* WCN3680 Pronto 1.5.1.2 expects these fields before sta context.
-+	 * Keep them as 0 to see if the offset was the only issue. */
-+	bss->dot11_mode = 0;
-+	bss->phy_mode = 0;
-+
- 	wcn36xx_smd_set_bss_vht_params(vif, sta_80211, bss);
++	if (wcn->rf_id == RF_IRIS_WCN3680) return wcn36xx_smd_config_sta_v0(wcn, vif, sta);
+ 	if (!wcn36xx_is_fw_version(wcn, 1, 2, 2, 24))
+ 		ret = wcn36xx_smd_config_sta_v1(wcn, vif, sta);
+ 	else
+@@ -1644,7 +1645,7 @@ static int wcn36xx_smd_config_bss_v1(struct wcn36xx *wcn,
  
- 	PREPARE_HAL_BUF(wcn->hal_buf, (*msg_body));
+ 	/* convert orig to v1 */
+ 	memcpy(bss->bssid, &bss_v0.bssid, ETH_ALEN);
+-	memcpy(bss->self_mac_addr, &bss_v0.self_mac_addr, ETH_ALEN);
++                { u8 my_mac[6] = {0x02, 0x00, 0x7f, 0x53, 0x68, 0x74}; memcpy(bss->self_mac_addr, my_mac, ETH_ALEN); }
+ 
+ 	bss->bss_type = bss_v0.bss_type;
+ 	bss->oper_mode = bss_v0.oper_mode;
+@@ -1828,6 +1829,7 @@ int wcn36xx_smd_config_bss(struct wcn36xx *wcn, struct ieee80211_vif *vif,
+ 
+ 	mutex_lock(&wcn->hal_mutex);
+ 
++	if (wcn->rf_id == RF_IRIS_WCN3680) return wcn36xx_smd_config_bss_v0(wcn, vif, sta, bssid, update);
+ 	if (!wcn36xx_is_fw_version(wcn, 1, 2, 2, 24))
+ 		ret = wcn36xx_smd_config_bss_v1(wcn, vif, sta, bssid, update);
+ 	else
