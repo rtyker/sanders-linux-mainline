@@ -94,19 +94,33 @@ current_mac() {
 # `set +e` localmente — btmgmt as vezes retorna erro mesmo aplicando.
 set +e
 
-CUR=$(current_mac)
+# Aguarda ate 20s para o controller hci0 estar completamente pronto e responsivo via btmgmt
+CUR=""
+for _ in $(seq 1 20); do
+    [ -d /sys/class/bluetooth/hci0 ] || { sleep 1; continue; }
+    CUR=$(current_mac)
+    [ -n "$CUR" ] && break
+    sleep 1
+done
+
+if [ -z "$CUR" ]; then
+    echo "sanders-bt-mac: hci0 nao respondeu via btmgmt apos 20s" >&2
+    exit 1
+fi
+
 if [ "$CUR" = "$MAC" ]; then
     echo "sanders-bt-mac: hci0 ja esta com $MAC"
     exit 0
 fi
+
 
 echo "sanders-bt-mac: applying $MAC to hci0 (estava $CUR)"
 
 btmgmt_run power off       >/dev/null 2>&1
 btmgmt_run public-addr "$MAC" >/dev/null 2>&1
 
-# public-addr pode re-criar o controller; espera hci0 voltar (ate 5s).
-for _ in 1 2 3 4 5; do
+# public-addr pode re-criar o controller; espera hci0 voltar (ate 10s).
+for _ in $(seq 1 10); do
     [ -e /sys/class/bluetooth/hci0 ] && break
     sleep 1
 done
@@ -115,8 +129,8 @@ btmgmt_run power on >/dev/null 2>&1
 
 # Validacao final com retry: depois de `power on` o controller as vezes
 # ainda esta finalizando re-init e `info` devolve string vazia. Tenta
-# por ate ~5s.
-for _ in 1 2 3 4 5; do
+# por ate ~10s — o wcnss pode demorar pra estabilizar o hci0.
+for _ in $(seq 1 10); do
     CUR=$(current_mac)
     if [ "$CUR" = "$MAC" ]; then
         echo "sanders-bt-mac: hci0 agora com $MAC"
@@ -125,5 +139,5 @@ for _ in 1 2 3 4 5; do
     sleep 1
 done
 
-echo "sanders-bt-mac: aplicou public-addr mas info reporta '$CUR'" >&2
+echo "sanders-bt-mac: aplicou public-addr mas info reporta '$CUR' (10 tentativas)" >&2
 exit 1
