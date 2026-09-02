@@ -79,15 +79,29 @@ cmd_heartbeat() {
 
 cmd_status() {
     # Auto-detecta: blink se sem rede, on se ok.
+    # Verifica usb0 (gadget), wlan0 (Wi-Fi) e qualquer iface Ethernet
+    # USB (enx*/eth0 — OTG host mode com adaptador).
     local has_net=0
 
-    # Checa se usb0 tem IP (conectado ao host).
+    # usb0 (conectado ao host via USB CDC ECM)
     if ip -4 addr show dev usb0 2>/dev/null | awk '/inet /{found=1} END{exit !found}'; then
         has_net=1
     fi
-    # Checa se wlan0 tem IP.
+    # wlan0 (Wi-Fi wcn36xx)
     if ip -4 addr show dev wlan0 2>/dev/null | awk '/inet /{found=1} END{exit !found}'; then
         has_net=1
+    fi
+    # USB OTG Ethernet (enx[MAC], eth0, etc.)
+    if [ "$has_net" -eq 0 ]; then
+        for iface in /sys/class/net/en* /sys/class/net/eth0; do
+            [ -d "$iface" ] || continue
+            local name
+            name=$(basename "$iface")
+            if ip -4 addr show dev "$name" 2>/dev/null | awk '/inet /{found=1} END{exit !found}'; then
+                has_net=1
+                break
+            fi
+        done
     fi
 
     if [ "$has_net" -eq 1 ]; then

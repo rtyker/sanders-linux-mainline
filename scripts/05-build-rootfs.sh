@@ -58,12 +58,16 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
     arch-chroot "$MNT" locale-gen >/dev/null 2>&1 || warn "locale-gen falhou"
 
     # Pacotes base para os dois flavors.
-    msg "instalando pacotes base (samba + terminus-font + bluez + bluez-utils)..."
+    msg "instalando pacotes base (iw + wpa_supplicant + dhcpcd + samba + bluez)..."
     # terminus-font: corrige systemd-vconsole-setup.service (setfont ter-v16b).
+    # iw + wpa_supplicant: pilha Wi-Fi (scan + autenticacao WPA2).
+    # dhcpcd: fallback de DHCP caso systemd-networkd nao pegue.
+    # wireless-regdb + crda: database de regulacao RF por pais.
     # samba: util pros dois flavors (compartilhar /home via Wi-Fi/USB).
     # bluez e bluez-utils: pilha bluetooth (bluetoothd) e utilitarios CLI (bluetoothctl, btmgmt).
     # Nao habilita servico — usuario decide com `systemctl enable smb nmb`.
     arch-chroot "$MNT" pacman -Sy --noconfirm --needed \
+        iw wpa_supplicant dhcpcd wireless-regdb crda \
         samba terminus-font bluez bluez-utils \
         || warn "pacman -S pacotes base falhou"
 
@@ -191,10 +195,53 @@ ConfigureWithoutCarrier=yes
 [Route]
 Destination=0.0.0.0/0
 Gateway=10.42.0.1
-# Metrica alta pra nao competir com wlan se um dia tiver — usb gadget eh
-# rede de servico, nao a saida primaria.
+# Metrica alta pra nao competir com wlan — usb gadget eh rede de servico.
 Metric=100
 EOF
+
+# Wi-Fi (wlan0): DHCP via systemd-networkd. wpa_supplicant gerencia a
+# associacao; o config real (SSID/senha) e preenchido pelo usuario com
+# sanders-network-setup.sh ou wpa_passphrase. Servico so sobe se o
+# arquivo de config existir e tiver conteudo (opcao do wpa_supplicant@).
+mkdir -p "$MNT/etc/wpa_supplicant"
+cat > "$MNT/etc/wpa_supplicant/wpa_supplicant-wlan0.conf" <<'EOF'
+ctrl_interface=/run/wpa_supplicant
+ctrl_interface_group=root
+update_config=1
+EOF
+ln -sf /usr/lib/systemd/system/wpa_supplicant@.service \
+    "$MNT/etc/systemd/system/multi-user.target.wants/wpa_supplicant@wlan0.service"
+cat > "$MNT/etc/systemd/network/20-wlan0.network" <<'EOF'
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+DNS=8.8.8.8
+DNS=1.1.1.1
+
+[DHCP]
+RouteMetric=10
+EOF
+
+# USB OTG Ethernet (host mode): DHCP via systemd-networkd.
+# Quando um adaptador USB-C pra Ethernet e plugado no phone, o DWC3
+# troca pra host mode e o adaptador aparece como enx[MAC] (predizivel).
+# Tambem cobre eth0/naming legacy. Metrica baixa (10) pra ser a
+# saida primaria quando conectado — preferida sobre wlan0 (10) e usb0 (100).
+cat > "$MNT/etc/systemd/network/30-en-eth.network" <<'EOF'
+[Match]
+Driver=cdc_ether|rndis_host|cdc_ncm|usb_ether
+
+[Network]
+DHCP=yes
+DNS=8.8.8.8
+DNS=1.1.1.1
+
+[DHCP]
+RouteMetric=10
+EOF
+
 # resolv.conf gerenciado por systemd-resolved (que pega DNS do networkd)
 ln -sf /run/systemd/resolve/stub-resolv.conf "$MNT/etc/resolv.conf"
 ln -sf /usr/lib/systemd/system/systemd-resolved.service \
