@@ -37,7 +37,17 @@
 
 		framebuffer@90001000 {
 			compatible = "simple-framebuffer";
-			reg = <0 0x90001000 0 (2220 * 1920 * 3)>;
+			/* Era (2220 * 1920 * 3) = 12.787.200 bytes — quase o
+			 * dobro do que cont_splash_mem reserva (1080*1920*3 =
+			 * 6.220.800, no-map). simplefb.c faz
+			 * ioremap_wc(smem_start, resource_size(mem)) usando o
+			 * tamanho cheio do reg, nao width*height*stride — os
+			 * ~6.5MB extras mapeados write-combining cairiam em
+			 * RAM normal nao reservada, dual-mapped com atributos
+			 * de cache incompativeis (risco real de corrupcao).
+			 * 1080, nao 2220 — bate com stride (1080*3=3240) *
+			 * height (1920) e com o cont_splash_mem real. */
+			reg = <0 0x90001000 0 (1080 * 1920 * 3)>;
 
 			width = <1080>;
 			height = <1920>;
