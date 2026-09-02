@@ -275,7 +275,7 @@ cat > "$MNT/etc/ssh/sshd_config.d/10-sanders.conf" <<'EOF'
 PermitRootLogin prohibit-password
 PubkeyAuthentication yes
 PasswordAuthentication no
-ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
 UsePAM yes
 EOF
 ln -sf /usr/lib/systemd/system/sshd.service \

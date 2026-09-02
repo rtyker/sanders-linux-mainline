@@ -53,8 +53,17 @@ msg "aplicando config fragment do sanders..."
 ./scripts/kconfig/merge_config.sh -m .config "$REPO/kernel/sanders.config.fragment"
 make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" olddefconfig
 
-msg "compilando kernel (Image.gz + dtbs)..."
-make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" -j"$(nproc)" Image.gz dtbs
+msg "compilando kernel (Image.gz + dtb do sanders)..."
+# So o dtb do sanders, nao "dtbs" (que compila TODOS os DTBs qcom da
+# arvore — dezenas, minutos desperdicados a cada build/rebuild).
+# ATENCAO: o target e relativo a arch/arm64/boot/dts/, SEM repetir esse
+# prefixo (ex.: "qcom/foo.dtb", nao "arch/arm64/boot/dts/qcom/foo.dtb")
+# — com o prefixo completo o make duplica o path
+# ("arch/arm64/boot/dts/arch/arm64/boot/dts/qcom/...") e falha com
+# "Sem regra para processar o alvo". Testado e confirmado: só recompila
+# o DTB do sanders (1 linha "DTC"), não os demais.
+make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" -j"$(nproc)" \
+    Image.gz "qcom/$DTS_NAME.dtb"
 
 KERNEL="$LINUX_SRC/arch/arm64/boot/Image.gz"
 DTB="$LINUX_SRC/arch/arm64/boot/dts/qcom/$DTS_NAME.dtb"
