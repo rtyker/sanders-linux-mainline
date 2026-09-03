@@ -51,13 +51,19 @@ flavor_xfce_install() {
         ttf-dejavu noto-fonts
 
     echo "[flavor:xfce] Escrevendo xinitrc..."
-    # dbus-launch (nao "exec startxfce4" puro) — sem sessao D-Bus, varios
-    # componentes do XFCE (notificacoes, thunar, polkit, panel plugins)
-    # falham silenciosamente com "unable to connect to D-Bus". Confirmado
-    # ao vivo 2026-09-03.
+    # dbus-run-session (nao "exec startxfce4" puro, nem "dbus-launch"):
+    # sem sessao D-Bus, o XFCE mostra "Nao foi possivel se comunicar com
+    # o servidor de configuracoes" (xfconfd) e varios componentes
+    # (notificacoes, thunar, polkit) falham. Confirmado ao vivo
+    # 2026-09-03. dbus-launch (double-fork classico) tambem foi
+    # tentado primeiro mas o dbus-daemon que ele desanexa em background
+    # desaparecia sob a supervisao de cgroup do systemd (o socket em
+    # /tmp sumia, xfconfd nunca subia). dbus-run-session mantem o
+    # dbus-daemon como filho direto do processo em vez de daemonizar,
+    # o que sobrevive normalmente dentro de um systemd service.
     cat > /usr/local/bin/sanders-xfce-xinitrc <<'EOF'
 #!/bin/sh
-exec dbus-launch --exit-with-session startxfce4
+exec dbus-run-session -- startxfce4
 EOF
     chmod +x /usr/local/bin/sanders-xfce-xinitrc
 
