@@ -157,18 +157,26 @@ wlan0: CTRL-EVENT-DISCONNECTED bssid=6a:fa:c4:ea:34:9c reason=15
 
 ---
 
-## 🎯 Roteiro para a Próxima Fase do Wi-Fi
+## 🎯 Roteiro (histórico — item 1 RESOLVIDO em 2026-09-03)
 
-Para futuras sessões focadas na resolução definitiva do Wi-Fi, os caminhos técnicos mapeados são:
+1. ✅ **Investigação do Formato Híbrido V1 / V0 — RESOLVIDO.** Era exatamente isso:
+   `WCN36XX_DIFF_BSS_PARAMS_V1_NOVHT`/`_STA_PARAMS_V1_NOVHT` já existiam no driver
+   mainline, só precisavam ser selecionados com base na capacidade `DOT11AC`
+   realmente concedida pela firmware (`wcn36xx_firmware_get_feat_caps`), não pelo
+   `rf_id` isolado. Ver seção "Solução tentada #2" acima.
+2. **(Não necessário agora, mas registrado para referência)** Comparação
+   byte-a-byte com o driver CAF stock (Android 3.18/Prima) — ficaria útil só se o
+   fix atual regredir em algum firmware/board diferente no futuro.
+3. **(Não necessário agora)** Firmware alternativa de outro device MSM8953.
+4. **Modo Operacional Atual do Servidor:** Wi-Fi nativo agora é uma opção viável de
+   rede standalone (WPA2, HT/802.11n, sem VHT/5GHz-ac). USB OTG Ethernet e USB ECM
+   (`10.42.0.2`) continuam disponíveis como alternativas.
 
-1. **Investigação do Formato Híbrido V1 / V0:**
-   * O Pronto v3 (`qcom,pronto-v3-pil`) possui definições com `#define WCN36XX_DIFF_BSS_PARAMS_V1_NOVHT`.
-   * Testar se a firmware 1.5.1.2 espera a mensagem BSS no formato `V1` com tamanho reduzido (`NOVHT`) em vez de `V0` puro.
-2. **Comparação Byte-a-Byte com o Driver CAF Stock (Android 3.18 / Prima):**
-   * Extrair a `struct hal_config_bss_req_msg` do kernel CAF da Motorola (`drivers/net/wireless/wcnss/wcnss_wlan.c` e `wcnss_v1.c` da árvore stock do sanders/potter).
-   * Comparar o alinhamento de memória (`sizeof`), campos adicionados/removidos e a ordem das structs de BSS e STA.
-3. **Alternativa via Firmware alternativa de outro device MSM8953:**
-   * Testar arquivos `wcnss.mdt` / `wcnss.b*` extraídos de outros aparelhos Snapdragon 625 com mainline maduro (ex: Xiaomi Redmi 4X / `santoni` ou Xiaomi Mi A1 / `tissot`), que utilizam firmwares Pronto com suporte V1/VHT estável.
-4. **Modo Operacional Atual do Servidor:**
-   * Até que o handshake WPA2 seja sanado, a rede standalone recomendada para o servidor é via adaptador USB Ethernet (OTG) ou USB ECM (`10.42.0.2`).
+## 🎯 Trabalho futuro (opcional, não bloqueia nada)
+
+- Confirmar se o VHT/802.11ac (5GHz) funcionaria em firmwares Pronto mais recentes
+  que realmente concedam `DOT11AC` — não é o caso da firmware stock atual (1.5.1.2),
+  então isso é só curiosidade, não uma pendência prática pro servidor headless.
+- Testar estabilidade de longa duração (reconexão após roaming, suspensão de rede,
+  etc.) — fora do escopo desta sessão, que validou conectividade básica.
 
