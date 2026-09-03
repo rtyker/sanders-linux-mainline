@@ -10,16 +10,23 @@
 #   sanders-flavor-install.sh <flavor>           # instala e habilita
 #   sanders-flavor-install.sh <flavor> --remove  # desabilita (nao desinstala pacotes)
 #
-# Flavors disponiveis: xfce
+# Flavors disponiveis: xfce, xorg-minimal, wayland-minimal
 
 set -euo pipefail
 
 FLAVOR="${1:-}"
 ACTION="${2:---install}"
 
+# Painel DSI e fisicamente portrait (1080x1920, connector "DSI-1" — via
+# DRM_MSM, confirmado ao vivo 2026-09-03 com `xrandr --query`). Usado
+# pelos flavors X11 (xrandr) e Wayland (weston.ini transform=).
+DSI_CONNECTOR="DSI-1"
+
 list_flavors() {
     echo "Flavors disponiveis:"
-    echo "  xfce   — Xorg + XFCE4 (desktop leve via X11, ativado no tty1) + x11vnc (acesso remoto VNC :5900)"
+    echo "  xfce             — Xorg + XFCE4 (desktop leve via X11, tty1) + x11vnc (:5900)"
+    echo "  xorg-minimal     — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900)"
+    echo "  wayland-minimal  — Weston (compositor Wayland minimo, sem shell/painel extra), backend VNC nativo (:5900)"
 }
 
 pacman_install() {
@@ -29,25 +36,71 @@ pacman_install() {
     pacman -Syu --noconfirm --needed "$@"
 }
 
+# --- Helper compartilhado: x11vnc (usado por xfce e xorg-minimal) ----------
+#
+# Generico de proposito — nao tem Requires= fixo numa unit de flavor
+# especifica. Assim funciona com qualquer sessao X11 que suba em :0,
+# nao importa qual flavor (xfce ou xorg-minimal) esta ativo no momento;
+# so fica tentando reconectar (Restart=on-failure) ate a sessao aparecer.
+setup_x11vnc_service() {
+    local tag="$1"
+
+    pacman_install x11vnc
+
+    echo "[$tag] Configurando senha do VNC (x11vnc)..."
+    mkdir -p /root/.vnc
+    if [ ! -f /root/.vnc/passwd ]; then
+        # Senha aleatoria gerada na primeira instalacao — x11vnc exige
+        # arquivo de senha pra nao expor a sessao root sem autenticacao
+        # nenhuma na rede. Reexecucoes preservam a senha ja gerada
+        # (idempotente) — compartilhada entre flavors X11.
+        VNC_PASS="$(head -c 12 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 12)"
+        x11vnc -storepasswd "$VNC_PASS" /root/.vnc/passwd >/dev/null
+        echo "[$tag] Senha VNC gerada: $VNC_PASS  (salva em /root/.vnc/passwd, guarde/anote agora)"
+    else
+        echo "[$tag] Senha VNC ja configurada em /root/.vnc/passwd (nao alterada)."
+    fi
+
+    echo "[$tag] Instalando unit systemd do x11vnc (porta 5900, compartilha a sessao :0)..."
+    cat > /etc/systemd/system/sanders-x11vnc.service <<'EOF'
+[Unit]
+Description=x11vnc — acesso remoto VNC pra sessao X11 (sanders flavor)
+After=graphical.target
+
+[Service]
+User=root
+# XAUTHORITY fixo (nao o -auth aleatorio do startx) — os flavors X11
+# (xfce, xorg-minimal) tambem apontam pra esse mesmo arquivo, entao o
+# x11vnc consegue se autenticar contra o display :0 sem precisar
+# descobrir o cookie. Sem Requires= numa unit especifica de flavor —
+# fica retentando (Restart=on-failure) ate a sessao X aparecer,
+# funciona com qualquer flavor X11 ativo no tty1.
+Environment=XAUTHORITY=/root/.Xauthority
+ExecStart=/usr/bin/x11vnc -display :0 -auth /root/.Xauthority -rfbauth /root/.vnc/passwd -forever -shared -rfbport 5900 -noxdamage -bg -o /var/log/x11vnc.log
+Type=forking
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+}
+
+# --- Flavor: xfce -----------------------------------------------------------
+
 flavor_xfce_install() {
     echo "[flavor:xfce] Instalando Xorg + XFCE4..."
     # Driver KMS generico ("modesetting") ja vem embutido no proprio
     # xorg-server desde 2018 — nao existe mais como pacote separado
     # (confirmado ao vivo 2026-09-03: "target not found:
-    # xf86-video-modesetting"). Funciona com o DRM_MSM (card1-DSI-1)
-    # ja ativo sem nada extra.
+    # xf86-video-modesetting"). Funciona com o DRM_MSM ja ativo sem
+    # nada extra.
     # xf86-input-libinput: touchscreen FT5436 (evdev) via libinput.
-    # x11vnc: acesso remoto — compartilha a sessao X real (:0, a mesma
-    # que aparece na tela fisica via tty1), em vez de abrir uma sessao
-    # nova por conexao como o xrdp faria. Trocado de xrdp pra x11vnc
-    # porque xrdp/xorgxrdp nao existem nos repositorios binarios do
-    # Arch Linux ARM (so via AUR/compilacao — "target not found: xrdp",
-    # confirmado ao vivo 2026-09-03); x11vnc/tigervnc estao em extra/.
     pacman_install \
         xorg-server xorg-xinit xorg-xrandr \
         xf86-input-libinput \
         xfce4 xfce4-terminal \
-        x11vnc \
         ttf-dejavu noto-fonts
 
     echo "[flavor:xfce] Escrevendo xinitrc..."
@@ -61,60 +114,23 @@ flavor_xfce_install() {
     # /tmp sumia, xfconfd nunca subia). dbus-run-session mantem o
     # dbus-daemon como filho direto do processo em vez de daemonizar,
     # o que sobrevive normalmente dentro de um systemd service.
-    # Painel DSI e fisicamente portrait (1080x1920, connector "DSI-1" —
-    # confirmado ao vivo 2026-09-03 via `xrandr --query`). Gira pra
-    # paisagem por default antes de subir a sessao XFCE.
-    cat > /usr/local/bin/sanders-xfce-xinitrc <<'EOF'
+    cat > /usr/local/bin/sanders-xfce-xinitrc <<EOF
 #!/bin/sh
-xrandr --output DSI-1 --rotate left
+xrandr --output $DSI_CONNECTOR --rotate left
 exec dbus-run-session -- startxfce4
 EOF
     chmod +x /usr/local/bin/sanders-xfce-xinitrc
 
-    echo "[flavor:xfce] Configurando senha do VNC (x11vnc)..."
-    mkdir -p /root/.vnc
-    if [ ! -f /root/.vnc/passwd ]; then
-        # Senha aleatoria gerada na primeira instalacao — x11vnc exige
-        # arquivo de senha pra nao expor a sessao root sem autenticacao
-        # nenhuma na rede. Reexecucoes do script preservam a senha ja
-        # gerada (idempotente).
-        VNC_PASS="$(head -c 12 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 12)"
-        x11vnc -storepasswd "$VNC_PASS" /root/.vnc/passwd >/dev/null
-        echo "[flavor:xfce] Senha VNC gerada: $VNC_PASS  (salva em /root/.vnc/passwd, guarde/anote agora)"
-    else
-        echo "[flavor:xfce] Senha VNC ja configurada em /root/.vnc/passwd (nao alterada)."
-    fi
-
-    echo "[flavor:xfce] Instalando unit systemd do x11vnc (porta 5900, compartilha a sessao :0)..."
-    cat > /etc/systemd/system/sanders-x11vnc.service <<'EOF'
-[Unit]
-Description=x11vnc — acesso remoto VNC pra sessao XFCE (sanders flavor: xfce)
-After=sanders-xfce.service
-Requires=sanders-xfce.service
-
-[Service]
-User=root
-# XAUTHORITY fixo (nao o -auth aleatorio do startx) — sanders-xfce.service
-# tambem aponta pra esse mesmo arquivo, entao o x11vnc consegue se
-# autenticar contra o display :0 sem precisar descobrir o cookie.
-Environment=XAUTHORITY=/root/.Xauthority
-ExecStart=/usr/bin/x11vnc -display :0 -auth /root/.Xauthority -rfbauth /root/.vnc/passwd -forever -shared -rfbport 5900 -noxdamage -bg -o /var/log/x11vnc.log
-Type=forking
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    setup_x11vnc_service "flavor:xfce"
 
     echo "[flavor:xfce] Instalando unit systemd (tty1, mesmo padrao do weston/phosh)..."
     cat > /etc/systemd/system/sanders-xfce.service <<'EOF'
 [Unit]
 Description=Xorg + XFCE4 desktop (sanders flavor: xfce)
 After=systemd-user-sessions.service
-# So um ambiente grafico por vez no tty1 — evita os dois brigarem pela
-# mesma tty se o flavor "desktop" (weston/phosh) tambem estiver presente.
-Conflicts=getty@tty1.service weston.service phosh.service
+# So um ambiente grafico por vez no tty1 — evita brigar pela mesma tty
+# com outros flavors X11/Wayland.
+Conflicts=getty@tty1.service weston.service phosh.service sanders-xorg-minimal.service sanders-weston-minimal.service
 
 [Service]
 User=root
@@ -143,7 +159,6 @@ EOF
     echo "  systemctl disable --now getty@tty1.service"
     echo "  systemctl enable --now sanders-xfce.service   # sessao na tela fisica"
     echo "  systemctl enable --now sanders-x11vnc.service # acesso remoto VNC, porta 5900"
-    echo "  (x11vnc precisa da sessao XFCE ja rodando — Requires=sanders-xfce.service cuida disso)"
 }
 
 flavor_xfce_remove() {
@@ -153,18 +168,190 @@ flavor_xfce_remove() {
     systemctl enable --now getty@tty1.service 2>/dev/null || true
 }
 
+# --- Flavor: xorg-minimal ----------------------------------------------------
+#
+# So Xorg + xterm, sem gerenciador de janelas nem desktop nenhum — pra
+# desenvolver/testar seu proprio app grafico direto, sem overhead de
+# painel/DE. Sobe um xterm por default (troque/edite o xinitrc se seu
+# app deve subir sozinho no lugar dele).
+
+flavor_xorgmin_install() {
+    echo "[flavor:xorg-minimal] Instalando Xorg minimo..."
+    pacman_install \
+        xorg-server xorg-xinit xorg-xrandr \
+        xf86-input-libinput \
+        xterm
+
+    echo "[flavor:xorg-minimal] Escrevendo xinitrc..."
+    cat > /usr/local/bin/sanders-xorgmin-xinitrc <<EOF
+#!/bin/sh
+xrandr --output $DSI_CONNECTOR --rotate left
+# Sem gerenciador de janelas — so um xterm. Pra rodar seu proprio app
+# no lugar, troque a linha abaixo (ou aponte DISPLAY=:0 pra ele e rode
+# via SSH/systemd separado, com esse xterm so de fallback/debug).
+exec xterm -fa Monospace -fs 14
+EOF
+    chmod +x /usr/local/bin/sanders-xorgmin-xinitrc
+
+    setup_x11vnc_service "flavor:xorg-minimal"
+
+    echo "[flavor:xorg-minimal] Instalando unit systemd (tty1)..."
+    cat > /etc/systemd/system/sanders-xorg-minimal.service <<'EOF'
+[Unit]
+Description=Xorg minimo + xterm (sanders flavor: xorg-minimal)
+After=systemd-user-sessions.service
+Conflicts=getty@tty1.service weston.service phosh.service sanders-xfce.service sanders-weston-minimal.service
+
+[Service]
+User=root
+Environment=XAUTHORITY=/root/.Xauthority
+ExecStart=/usr/bin/startx /usr/local/bin/sanders-xorgmin-xinitrc -- :0 vt1 -keeptty -nolisten tcp -auth /root/.Xauthority
+Restart=on-failure
+RestartSec=3
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    echo "[flavor:xorg-minimal] Instalado, mas NADA habilitado automaticamente ainda. Pra ligar:"
+    echo "  systemctl disable --now getty@tty1.service"
+    echo "  systemctl enable --now sanders-xorg-minimal.service"
+    echo "  systemctl enable --now sanders-x11vnc.service # acesso remoto VNC, porta 5900"
+}
+
+flavor_xorgmin_remove() {
+    echo "[flavor:xorg-minimal] Desabilitando..."
+    systemctl disable --now sanders-xorg-minimal.service 2>/dev/null || true
+    systemctl disable --now sanders-x11vnc.service 2>/dev/null || true
+    systemctl enable --now getty@tty1.service 2>/dev/null || true
+}
+
+# --- Flavor: wayland-minimal (Weston) ---------------------------------------
+#
+# Weston puro, sem shell/painel de desktop extra, com o backend VNC
+# NATIVO dele (nao x11vnc — Wayland nao e X11). Diferenca importante:
+# o backend VNC do Weston cria uma SAIDA VIRTUAL SEPARADA, nao espelha
+# a tela fisica (DSI) — quem conectar via VNC ve um desktop Wayland
+# independente, nao o que esta na tela do aparelho. Autenticacao e via
+# PAM (usuario/senha do sistema — root + a senha local), nao um
+# arquivo de senha VNC dedicado; o pacote weston ja instala o
+# /etc/pam.d/weston-remote-access necessario, nada a configurar aqui.
+
+flavor_westonmin_install() {
+    echo "[flavor:wayland-minimal] Instalando Weston..."
+    # neatvnc: dependencia opcional do weston pro backend VNC funcionar
+    # de verdade — sem ela o "weston --backends=drm-backend.so,vnc-backend.so"
+    # falha ao carregar o modulo VNC. seatd: weston moderno usa libseat
+    # pra gerenciar acesso ao DRM/VT — sem ele (nem logind, que este
+    # rootfs minimal nao tem) weston morre com "fatal: your system
+    # should either provide the logind D-Bus API, or use seatd."
+    # Confirmado ao vivo 2026-09-03 (mesma dependencia que ja existia
+    # pro weston.service do flavor "desktop" antigo, so nao tinha sido
+    # replicada aqui).
+    pacman_install weston neatvnc seatd
+
+    echo "[flavor:wayland-minimal] Habilitando seatd..."
+    systemctl enable --now seatd.service
+
+    echo "[flavor:wayland-minimal] Escrevendo weston.ini..."
+    mkdir -p /root/.config
+    cat > /root/.config/weston.ini <<EOF
+[core]
+xwayland=false
+idle-time=0
+require-input=false
+
+[shell]
+locking=false
+
+[output]
+name=$DSI_CONNECTOR
+transform=rotate-270
+
+[output]
+name=vnc
+mode=1920x1080
+EOF
+
+    echo "[flavor:wayland-minimal] Instalando unit systemd (tty1, backends drm+vnc simultaneos)..."
+    # --disable-transport-layer-security: sem isso o backend VNC exige
+    # TLS (certificado auto-assinado ou fornecido) — pra manter simples
+    # e consistente com o x11vnc dos outros flavors (tambem sem TLS,
+    # mesma postura de seguranca — uso pretendido e rede local/confiavel).
+    cat > /etc/systemd/system/sanders-weston-minimal.service <<'EOF'
+[Unit]
+Description=Weston minimo (Wayland) + backend VNC nativo (sanders flavor: wayland-minimal)
+After=systemd-user-sessions.service seatd.service
+Wants=seatd.service
+Conflicts=getty@tty1.service weston.service phosh.service sanders-xfce.service sanders-xorg-minimal.service
+
+[Service]
+User=root
+Environment=XDG_RUNTIME_DIR=/run/user/0
+ExecStartPre=/bin/mkdir -p /run/user/0
+ExecStartPre=/bin/chmod 700 /run/user/0
+# --renderer=pixman: este kernel nao expoe GPU (Adreno) nenhuma — dmesg
+# mostra "msm_mdp: no GPU device was found", so o display-controller
+# MDP5/DSI existe. O renderer GL/EGL padrao do weston tenta abrir um
+# device de GPU (freedreno) que nao existe, causa "fd_pipe_new2:
+# allocation failed" e crash com core-dump, tela fica preta. Confirmado
+# ao vivo 2026-09-03. Pixman (software) nao depende de GPU nenhuma —
+# mesma razao pela qual o Xorg com "modesetting" (flavors xfce e
+# xorg-minimal) ja funciona sem GL.
+ExecStart=/usr/bin/weston --backends=drm-backend.so,vnc-backend.so --renderer=pixman --disable-transport-layer-security
+Restart=on-failure
+RestartSec=3
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    echo "[flavor:wayland-minimal] Instalado, mas NAO habilitado automaticamente. Pra ligar:"
+    echo "  systemctl disable --now getty@tty1.service"
+    echo "  systemctl enable --now sanders-weston-minimal.service"
+    echo "[flavor:wayland-minimal] Acesso remoto: VNC na porta 5900, login = usuario 'root' + senha local do sistema"
+    echo "(PAM via /etc/pam.d/weston-remote-access, ja vem com o pacote weston). SEM TLS — rede local/confiavel apenas."
+    echo "[flavor:wayland-minimal] Lembrete: a saida VNC e uma tela VIRTUAL separada, nao espelha a tela fisica."
+}
+
+flavor_westonmin_remove() {
+    echo "[flavor:wayland-minimal] Desabilitando..."
+    systemctl disable --now sanders-weston-minimal.service 2>/dev/null || true
+    systemctl enable --now getty@tty1.service 2>/dev/null || true
+}
+
+# --- Dispatch -----------------------------------------------------------
+
 case "$FLAVOR" in
     list|"")
         list_flavors
         ;;
     xfce)
         case "$ACTION" in
-            --remove)
-                flavor_xfce_remove
-                ;;
-            *)
-                flavor_xfce_install
-                ;;
+            --remove) flavor_xfce_remove ;;
+            *)        flavor_xfce_install ;;
+        esac
+        ;;
+    xorg-minimal)
+        case "$ACTION" in
+            --remove) flavor_xorgmin_remove ;;
+            *)        flavor_xorgmin_install ;;
+        esac
+        ;;
+    wayland-minimal)
+        case "$ACTION" in
+            --remove) flavor_westonmin_remove ;;
+            *)        flavor_westonmin_install ;;
         esac
         ;;
     *)
