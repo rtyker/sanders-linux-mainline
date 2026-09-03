@@ -30,8 +30,23 @@ CONFIG_DRM_FBDEV_OVERALLOC=100
 # Dependencias diretas do DRM_MSM que precisam ser builtin pra nao restringi-lo a modulo (=m):
 CONFIG_QCOM_OCMEM=y
 CONFIG_QCOM_LLCC=y
-CONFIG_SND_SOC=y
 # Subsistema de Audio Qualcomm (Hexagon ADSP PAS/PIL + QDSP6 + Codecs WCD PM8916/PM8953)
+# SOUND/SND (core ALSA) precisam ser explicitos e builtin — sem eles em =y,
+# CONFIG_SND_SOC=y sozinho e capado de volta pra =m pelo olddefconfig (um
+# filho tristate nao pode ser "mais forte" que o pai), derrubando toda a
+# cascata de audio pra modulo mesmo com cada CONFIG_SND_SOC_* individual
+# pedindo =y no fragment. Confirmado ao vivo 2026-09-03: CONFIG_SND=m
+# default do defconfig e a causa raiz, nao os symbols de audio em si.
+CONFIG_SOUND=y
+CONFIG_SND=y
+CONFIG_SND_SOC=y
+# sound/soc/qcom/Kconfig inteiro (todos os CONFIG_SND_SOC_QDSP6_*, APQ8016_SBC,
+# etc.) vive dentro de "menuconfig SND_SOC_QCOM" / "if SND_SOC_QCOM". Sem
+# forcar o menuconfig em si =y, TODO o resto dentro do if fica capado pra =m
+# pelo olddefconfig mesmo com cada symbol individual pedindo =y — foi o que
+# aconteceu aqui, confirmado ao vivo 2026-09-03 (SND=y/SND_SOC=y sozinhos nao
+# bastaram, SND_SOC_QCOM tambem precisa).
+CONFIG_SND_SOC_QCOM=y
 CONFIG_QCOM_Q6V5_PAS=y
 CONFIG_QCOM_APR=y
 CONFIG_SND_SOC_QDSP6=y
@@ -44,6 +59,18 @@ CONFIG_SND_SOC_QDSP6_ADM=y
 CONFIG_SND_SOC_QDSP6_ROUTING=y
 CONFIG_SND_SOC_QDSP6_ASM=y
 CONFIG_SND_SOC_QDSP6_ASM_DAI=y
+# select's introduzidos numa versao mais nova do Kconfig do que a que o
+# fragment original foi escrito contra — sem forcar =y aqui, ficam =m
+# (dead, sem modprobe) e capam SND_SOC_QDSP6/APQ8016_SBC de volta pra =m
+# mesmo com os dois symbols de topo pedindo =y. Confirmado ao vivo
+# 2026-09-03.
+CONFIG_SND_SOC_QDSP6_APM=y
+CONFIG_SND_SOC_QDSP6_APM_DAI=y
+CONFIG_SND_SOC_QDSP6_APM_LPASS_DAI=y
+CONFIG_SND_SOC_QDSP6_PRM=y
+CONFIG_SND_SOC_QDSP6_PRM_LPASS_CLOCKS=y
+CONFIG_SND_SOC_QCOM_COMMON=y
+CONFIG_SND_SOC_LPASS_APQ8016=y
 CONFIG_SND_SOC_MSM8916_WCD_ANALOG=y
 CONFIG_SND_SOC_MSM8916_WCD_DIGITAL=y
 CONFIG_SND_SOC_APQ8016_SBC=y

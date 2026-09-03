@@ -618,7 +618,18 @@
 };
 
 &spmi_bus {
-	pmic@1 {
+	/*
+	 * codec@f000 estava sob pmic@1 (seguindo referencia de boards
+	 * msm8916/pm8916, onde o codec analogico vive na 2a USID do PMIC).
+	 * No potter/sanders (pm8953), a USID 1 nao tem driver bindado em
+	 * /sys/bus/spmi/devices/0-01 (sem erro no dmesg, sem deferred-probe
+	 * — silenciosamente sem probe, sugerindo falha de leitura SPMI /
+	 * nao ha chip fisico respondendo nessa USID). pmic@0 (USID 0, onde
+	 * adc/gpio/pon/rtc/temp-alarm ja probam OK) tem 0xf000 livre —
+	 * tentativa de mover o codec pra la. Confirmar contra o DTB de
+	 * fabrica antes de assumir que isso e definitivo.
+	 */
+	pmic@0 {
 		wcd_codec: codec@f000 {
 			compatible = "qcom,pm8916-wcd-analog-codec";
 			reg = <0xf000 0x200>;

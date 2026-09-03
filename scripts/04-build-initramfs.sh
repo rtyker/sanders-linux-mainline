@@ -50,6 +50,17 @@ if [ -d "$REPO/firmware" ] && ls "$REPO/firmware"/*.* >/dev/null 2>&1; then
         cp "$REPO/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin" \
             "$INITRAMFS_ROOT/lib/firmware/wlan/prima/"
     fi
+    # Mesmo motivo do wcnss acima: qcom_q6v5_pas (ADSP PIL, "qcom,msm8953-adsp-pil")
+    # tambem chama request_firmware("adsp.mdt") no probe do driver builtin, antes
+    # do switch_root. Sem isso, "Direct firmware load for adsp.mdt failed with
+    # error -2" e o codec digital falha em cascata com "failed to get mclk"
+    # (o clock provider q6afecc depende do ADSP estar de pe). Confirmado ao vivo
+    # 2026-09-03.
+    if ls "$REPO/firmware"/adsp.* >/dev/null 2>&1; then
+        mkdir -p "$INITRAMFS_ROOT/lib/firmware/qcom/msm8953"
+        cp "$REPO/firmware"/adsp.* "$INITRAMFS_ROOT/lib/firmware/qcom/msm8953/"
+        cp "$REPO/firmware"/adsp.* "$INITRAMFS_ROOT/lib/firmware/"
+    fi
 fi
 
 msg "compactando em $OUT/initramfs.cpio.gz..."
