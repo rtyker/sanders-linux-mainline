@@ -32,7 +32,17 @@ BUSYBOX_VER="1.36.1"
 LK2ND_FORK="https://github.com/playday3008/lk2nd.git"
 LK2ND_COMMIT="c8b47cd"
 LINUX_REPO="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
-LINUX_BRANCH="master"
+# Tag estavel fixa (nao "master") — reproduzivel: um clone novo sempre
+# pega o mesmo ponto exato, em vez de qualquer que seja o HEAD do
+# master no dia do clone (que pode ser um -rc). Atualizado 2026-09-03
+# de 7.1.0-rc4 (commit fixado do primeiro clone) pra v7.2 (ultima
+# release estavel do mainline na data), a pedido do usuario pra testar
+# Docker com um kernel mais recente. Pra atualizar de novo: `git fetch
+# --depth=1 origin tag vX.Y && git reset --hard vX.Y` dentro de
+# $LINUX_SRC (nao basta mudar essa variavel — 02-build-kernel.sh so
+# clona se $LINUX_SRC nao existir ainda), depois mudar essa constante
+# pra documentar a versao atual.
+LINUX_BRANCH="v7.2"
 ARCH_TARBALL_URL="http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz"
 
 # Cross toolchains

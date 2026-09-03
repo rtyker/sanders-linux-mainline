@@ -1,8 +1,8 @@
 diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index d592f4f4b..128d688a9 100644
+index 3eac4d0f8..a7e0d8cba 100644
 --- a/drivers/gpu/drm/panel/Kconfig
 +++ b/drivers/gpu/drm/panel/Kconfig
-@@ -1297,4 +1297,22 @@ config DRM_PANEL_XINPENG_XPP055C272
+@@ -1348,4 +1348,22 @@ config DRM_PANEL_XINPENG_XPP055C272
  	  Say Y here if you want to enable support for the Xinpeng
  	  XPP055C272 controller for 720x1280 LCD panels with MIPI/RGB/SPI
  	  system interfaces.
@@ -26,10 +26,10 @@ index d592f4f4b..128d688a9 100644
 +
  endmenu
 diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-index a4291dc39..5204ae167 100644
+index c2c5cf817..d4222b347 100644
 --- a/drivers/gpu/drm/panel/Makefile
 +++ b/drivers/gpu/drm/panel/Makefile
-@@ -128,3 +128,5 @@ obj-$(CONFIG_DRM_PANEL_VISIONOX_VTDR6130) += panel-visionox-vtdr6130.o
+@@ -131,3 +131,5 @@ obj-$(CONFIG_DRM_PANEL_VISIONOX_VTDR6130) += panel-visionox-vtdr6130.o
  obj-$(CONFIG_DRM_PANEL_VISIONOX_R66451) += panel-visionox-r66451.o
  obj-$(CONFIG_DRM_PANEL_WIDECHIPS_WS2401) += panel-widechips-ws2401.o
  obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
@@ -37,7 +37,7 @@ index a4291dc39..5204ae167 100644
 +obj-$(CONFIG_DRM_PANEL_TIANMA_TL052VDXP02) += panel-tianma-tl052vdxp02.o
 diff --git a/drivers/gpu/drm/panel/panel-boe-bs052fhm-a00-6c01.c b/drivers/gpu/drm/panel/panel-boe-bs052fhm-a00-6c01.c
 new file mode 100644
-index 000000000..28c62262d
+index 000000000..20d276f55
 --- /dev/null
 +++ b/drivers/gpu/drm/panel/panel-boe-bs052fhm-a00-6c01.c
 @@ -0,0 +1,270 @@
@@ -237,9 +237,11 @@ index 000000000..28c62262d
 +	struct boe_520_v0 *ctx;
 +	int ret;
 +
-+	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
-+	if (!ctx)
-+		return -ENOMEM;
++	ctx = devm_drm_panel_alloc(dev, struct boe_520_v0, panel,
++				   &boe_520_v0_panel_funcs,
++				   DRM_MODE_CONNECTOR_DSI);
++	if (IS_ERR(ctx))
++		return PTR_ERR(ctx);
 +
 +	ctx->supplies[0].supply = "vsn";
 +	ctx->supplies[1].supply = "vsp";
@@ -261,8 +263,6 @@ index 000000000..28c62262d
 +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
 +			  MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_LPM;
 +
-+	drm_panel_init(&ctx->panel, dev, &boe_520_v0_panel_funcs,
-+		       DRM_MODE_CONNECTOR_DSI);
 +	ctx->panel.prepare_prev_first = true;
 +
 +	ret = drm_panel_of_backlight(&ctx->panel);
@@ -313,7 +313,7 @@ index 000000000..28c62262d
 +MODULE_LICENSE("GPL");
 diff --git a/drivers/gpu/drm/panel/panel-tianma-tl052vdxp02.c b/drivers/gpu/drm/panel/panel-tianma-tl052vdxp02.c
 new file mode 100644
-index 000000000..0a90e3fa9
+index 000000000..b4c97ee98
 --- /dev/null
 +++ b/drivers/gpu/drm/panel/panel-tianma-tl052vdxp02.c
 @@ -0,0 +1,220 @@
@@ -463,9 +463,11 @@ index 000000000..0a90e3fa9
 +	struct tianma_520_v0 *ctx;
 +	int ret;
 +
-+	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
-+	if (!ctx)
-+		return -ENOMEM;
++	ctx = devm_drm_panel_alloc(dev, struct tianma_520_v0, panel,
++				   &tianma_520_v0_panel_funcs,
++				   DRM_MODE_CONNECTOR_DSI);
++	if (IS_ERR(ctx))
++		return PTR_ERR(ctx);
 +
 +	ctx->supplies[0].supply = "vsn";
 +	ctx->supplies[1].supply = "vsp";
@@ -487,8 +489,6 @@ index 000000000..0a90e3fa9
 +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
 +			  MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_LPM;
 +
-+	drm_panel_init(&ctx->panel, dev, &tianma_520_v0_panel_funcs,
-+		       DRM_MODE_CONNECTOR_DSI);
 +	ctx->panel.prepare_prev_first = true;
 +
 +	ret = drm_panel_of_backlight(&ctx->panel);
