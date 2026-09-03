@@ -437,6 +437,8 @@ O `lpass_codec` (c0f0000) precisa do clock MCLK do `q6afecc` (QDSP6 AFE clock co
 
 **Próximo passo:** investigar o timing do clock `q6afecc` e garantir que o MCLK está disponível quando o `lpass_codec` faz probe.
 
+**Confirmado ao vivo 2026-09-03 (Claude, pós build+deploy do fix 0006):** testado com arquivo MP3 real (5MB, não o tom sintético de 440Hz) via `aplay` e `mpg123 -a hw:0,0` — mesmo resultado em ambos: o dispositivo ALSA nem abre (`ALSA: Couldn't open audio device: Invalid argument` / `audio open error: Invalid argument`). Confirma que o bloqueador é no **open do PCM device** (kernel/driver, MCLK), não em decodificação/formato — um arquivo real se comporta identico ao teste sintético.
+
 ### 7.4 Kernel Config Relevantes
 ```
 CONFIG_SPMI=y
