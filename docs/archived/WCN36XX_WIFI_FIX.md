@@ -125,7 +125,7 @@ truncado (NOVHT), não V0 puro nem V1 completo.**
 autônomo (DTB "seguro", sem as mudanças experimentais de painel MIPI-DSI que outra
 sessão estava testando em paralelo no mesmo hardware) — isolando a variável do Wi-Fi
 de qualquer risco de boot hang relacionado a display. Ver
-`docs/DISPLAY_PANEL_PLAN.md` pro trabalho de painel, que segue em paralelo,
+`../../../docs/archived/DISPLAY_PANEL_PLAN.md` (no repo pai) pro trabalho de painel, que segue em paralelo,
 independente deste fix.
 
 ### Tentativa anterior (V0 puro, para referência histórica)
