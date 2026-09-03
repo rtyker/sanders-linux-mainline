@@ -4,7 +4,15 @@ Description=Restore Bluetooth MAC from /persist (sanders)
 # estar 100% pronto. sanders-bt-mac.sh agora espera explicitamente o
 # device aparecer e o btmgmt ficar responsivo (retry interno).
 After=local-fs.target sys-subsystem-bluetooth-devices-hci0.device dev-disk-by\x2dpartlabel-persist.device
-Before=bluetooth.service
+# Before=bluetooth.service sozinho so protege quando bluetoothd sobe
+# pelo nome de unit "bluetooth.service" (via target normal do boot).
+# O BlueZ registra esse unit com Alias=dbus-org.bluez.service no
+# [Install] — se algo (bluetoothctl, pipewire, etc.) dispara
+# ativacao por D-Bus usando esse alias antes do multi-user.target
+# normal, o systemd resolve pro mesmo unit por baixo dos panos, mas
+# declarar os dois nomes aqui deixa a ordenacao explicita e imune a
+# qualquer particularidade de resolucao de alias (BUG-008).
+Before=bluetooth.service dbus-org.bluez.service
 Wants=sys-subsystem-bluetooth-devices-hci0.device dev-disk-by\x2dpartlabel-persist.device
 # So executa se persist existir (senao nao tem MAC pra restaurar).
 # O After=/Wants= no device acima garante que o job so inicia (e so

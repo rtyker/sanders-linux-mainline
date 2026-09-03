@@ -115,11 +115,12 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 
 ---
 
-### 🟡 BUG-008: Race Condition de Concorrência D-Bus entre `btmgmt` e `bluetoothd`
+### ✅ BUG-008: Race Condition de Concorrência D-Bus entre `btmgmt` e `bluetoothd`
 - **Arquivo:** [`rootfs-overlay/common/etc/systemd/system/sanders-bt-mac.service`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/rootfs-overlay/common/etc/systemd/system/sanders-bt-mac.service)
 - **Gravidade:** 🟡 **Média**
 - **Sintoma:** Erro de `Permission Denied` ou `Invalid Index` ao rodar `btmgmt public-addr`.
-- **Causa Raiz:** O unit file especifica `Before=bluetooth.service`. No entanto, se o socket do BlueZ for ativado via D-Bus (`dbus-org.bluez.service`) por algum outro componente (ex: `bluetoothctl` ou `pipewire`), o daemon `bluetoothd` pode ser iniciado em paralelo com o `sanders-bt-mac.sh`. Quando o `bluetoothd` assume o controle do socket hci0, qualquer tentativa do `btmgmt` de alterar o endereço público é rejeitada.
+- **Causa Raiz:** O unit file especificava apenas `Before=bluetooth.service`. O BlueZ registra esse unit com `Alias=dbus-org.bluez.service` — se algo (`bluetoothctl`, `pipewire`, etc.) dispara ativação por D-Bus usando esse alias em vez do nome canônico, a resolução do systemd normalmente cai no mesmo unit, mas depender só do nome canônico deixava a ordenação implícita e sujeita a essa particularidade de resolução.
+- **Status:** ✅ **Corrigido (2026-09-03):** adicionado `Before=dbus-org.bluez.service` explicitamente ao lado de `Before=bluetooth.service`, deixando a ordenação garantida independente de qual dos dois nomes disparar a ativação.
 
 ---
 
@@ -144,6 +145,8 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 ## 5. 🕒 Sincronismo de Tempo e Diagnósticos
 
 ### 🟡 BUG-011: Bloqueio do Script de NTP em Inicializações Lentas do DNS (`sanders-timesync.sh`)
+- **Status:** Parcialmente melhorado (2026-09-03) — a mensagem final agora reflete corretamente se o sync foi ou não confirmado (ver BUG-A3). O bloqueio de até 30s+15s continua existindo por design (é bounded, não indefinido, e o unit não é `Before=` de nada crítico do boot), mas fica mais transparente quando não conclui a tempo.
+
 - **Arquivo:** [`rootfs-overlay/common/usr/local/bin/sanders-timesync.sh`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/rootfs-overlay/common/usr/local/bin/sanders-timesync.sh#L10)
 - **Gravidade:** 🟡 **Média**
 - **Sintoma:** O relógio do sistema não sincroniza no primeiro boot se a rede demorar mais de 30s para obter resposta de DNS.
@@ -174,56 +177,59 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 > já foram corrigidos em commits recentes **não** são repetidos (estão resolvidos). Status:
 > 🟠 Alta / 🟡 Média / 🔵 Baixa / 🔄 Aceito (design).
 
-### 🟠 BUG-A1: `CONFIG_I2C`/`CONFIG_I2C_QUP` não explicitados no fragment
+### ✅ BUG-A1: `CONFIG_I2C`/`CONFIG_I2C_QUP` não explicitados no fragment
 - **Arquivo:** `kernel/sanders.config.fragment`
 - **Gravidade:** 🟠 Alta (dependência condicional)
-- **Status:** Aberto
-- **Descrição:** O fragment habilita `CONFIG_TOUCHSCREEN_EDT_FT5X06=y` (i2c_3 @0x38) e
-  `CONFIG_LTR501=y` (i2c_7 @0x23), **mas não força `CONFIG_I2C`/`CONFIG_I2C_QUP` builtin**
-  (grep confirma: ausente do arquivo). Mesmo raciocínio do `CONFIG_PHY_QCOM_QUSB2` (forçar
-  `=y` porque não há modprobe no initramfs) deveria valer pro I2C. **Nota:** o `defconfig`
-  arm64 usual já traz `CONFIG_I2C=y`/`CONFIG_I2C_QUP=y`, então pode já estar OK — **a
-  confirmar no `.config` real do build** (ex.: `grep -E 'CONFIG_(I2C|I2C_QUP)=' build/linux/.config`).
+- **Status:** ✅ **Confirmado OK ao vivo (2026-09-03)** — `grep -E 'CONFIG_(I2C|I2C_QUP)=' build/linux/.config` retorna `CONFIG_I2C=y`/`CONFIG_I2C_QUP=y`, herdados do defconfig arm64 padrão. Não é bug real, o comportamento já era o esperado — a suspeita do relatório original foi descartada com evidência direta do `.config` do build atual.
 
-### 🟡 BUG-A2: `mkswap`/`swapon` incondicionais após cadeia `zramctl` (`sanders-zram.sh`)
+### ✅ BUG-A2: `mkswap`/`swapon` incondicionais após cadeia `zramctl` (`sanders-zram.sh`)
 - **Arquivo:** `rootfs-overlay/common/usr/local/bin/sanders-zram.sh:24-34`
 - **Gravidade:** 🟡 Média
-- **Status:** Aberto
-- **Descrição:** a cadeia `zramctl ... || zramctl ... || zramctl ...` seguida de `mkswap`/
-  `swapon` rodam **incondicionalmente**. Se **todos** os `zramctl` falharem, `mkswap` tenta
-  em `/dev/zram0` inexistente (sob `set -euo pipefail` isso mata o script, sem mensagem
-  clara). Além disso, `--algorithm` só existe em `zramctl` >= 2.39 (tem fallback sem flag,
-  então mitigado). **Melhorar:** checar retorno da cadeia antes do `mkswap`.
+- **Status:** ✅ **Corrigido (2026-09-03):** removido o `mkswap`/`swapon` de dentro de cada ramo (zramctl e sysfs), adicionada checagem explícita `[ -b /dev/zram0 ]` com mensagem de erro clara antes de seguir pro `mkswap`/`swapon`, em vez de depender do comportamento implícito do `set -e` no fim da cadeia `||`.
 
-### 🟡 BUG-A3: timesync imprime "Relógio ajustado" mesmo se sync não confirmou (`sanders-timesync.sh`)
+### ✅ BUG-A3: timesync imprime "Relógio ajustado" mesmo se sync não confirmou (`sanders-timesync.sh`)
 - **Arquivo:** `rootfs-overlay/common/usr/local/bin/sanders-timesync.sh:33`
 - **Gravidade:** 🟡 Média (mensagem enganosa)
-- **Status:** Aberto
-- **Descrição:** o loop espera até 15s por `System clock synchronized: yes`; se não
-  confirmar em 15s, **ainda** imprime `Relógio ajustado: $NOW`. O caminho de erro
-  ("inalcançáveis") só cobre quando o DNS nunca resolveu. **Sugestão:** flag de sucesso do
-  `SYNCED` para só imprimir sucesso de fato.
+- **Status:** ✅ **Corrigido (2026-09-03):** adicionada flag `SYNCED` explícita; a mensagem de sucesso só é impressa se `NTPSynchronized=yes` foi de fato confirmado dentro dos 15s, caso contrário imprime um `WARN` claro em vez da mensagem de sucesso enganosa.
 
-### 🔵 BUG-A4: parsing frágil de `timedatectl` no timesync
+### ✅ BUG-A4: parsing frágil de `timedatectl` no timesync
 - **Arquivo:** `sanders-timesync.sh:28`
 - **Gravidade:** 🔵 Baixa
-- **Status:** Aberto
-- **Descrição:** procura string exata `System clock synchronized: yes`; formato pode
-  variar entre versões do systemd.
+- **Status:** ✅ **Corrigido (2026-09-03):** trocado o parsing de texto de `timedatectl status` (formato pode variar entre versões do systemd) por `timedatectl show -p NTPSynchronized --value`, saída machine-readable estável (`yes`/`no`).
 
-### 🔵 BUG-A5: `01-build-lk2nd.sh` clona completo (sem `--depth=1`) e usa fallback HEAD
+### ✅ BUG-A5: `01-build-lk2nd.sh` clona completo (sem `--depth=1`) e usa fallback HEAD
 - **Arquivo:** `scripts/01-build-lk2nd.sh:10,14`
 - **Gravidade:** 🔵 Baixa (desempenho/robustez)
-- **Status:** Aberto
-- **Descrição:** `git clone` sem shallow; e se o commit `c8b47cd` não existir, `warn` mas
-  continua com HEAD → build não testado. **Nota:** já avisa via `warn` (mitigado).
+- **Status:** ✅ **Melhorado (2026-09-03):** agora tenta `git fetch --depth 1 origin $LK2ND_COMMIT` (shallow fetch por SHA fixo — GitHub suporta isso) antes de cair no clone completo como fallback. O fallback com `warn` pro HEAD, se o SHA realmente não existir no remoto, foi mantido (comportamento aceitável, já sinalizado).
 
-### 🔵 BUG-A6: `lib.sh` cmdline `earlycon` sem MMIO
+### 🔴 BUG-A6: `lib.sh` cmdline `earlycon` sem MMIO
 - **Arquivo:** `scripts/lib.sh:73`
-- **Gravidade:** 🔵 Baixa
-- **Status:** Aberto
-- **Descrição:** `earlycon` simples depende do console configurado; pode falhar
-  silenciosamente no early boot.
+- **Gravidade:** 🔵 Baixa (era) → tentativa de fix causou regressão 🔴 Crítica
+- **Status:** ❌ **Tentativa de fix revertida (2026-09-03) — NÃO REPETIR sem investigar a fundo antes.**
+- **Descrição:** `earlycon` simples só ativa via match de `OF_EARLYCON_DECLARE` contra
+  `chosen/stdout-path`; sem essa propriedade ele fica mudo no early boot (comportamento
+  original, sem risco).
+- **Tentativa de fix (2026-09-03):** adicionado `aliases { serial0 = &uart_0; }` +
+  `chosen { stdout-path = "serial0:115200n8"; }` no DTS, apontando pro mesmo UART do
+  console principal (`uart_0` @ 0x78af000, compatible `qcom,msm-uartdm`, mesmo device de
+  `ttyMSM0`). DTB compilou limpo e a resolução do alias ficou correta (`dtc -O dts`
+  confirmou `/soc@0/serial@78af000`). **Testado ao vivo: causou boot hang reproduzível** —
+  o dmesg via tela HDMI/framebuffer parava logo após
+  `[drm] Initialized simpledrm 1.0.0 for 90001000.frame`, sem UART/USB gadget subindo,
+  sem SSH, sem prompt. Reproduzido em 2 boots consecutivos (incluindo um cold-boot físico
+  após hard power-cycle). Causa provável: conflito de `earlycon` com o driver real
+  `msm_serial` (`OF_EARLYCON_DECLARE`) disputando a mesma região MMIO do UART — mas não
+  foi confirmado a fundo, só a correlação direta com a mudança (revertida = boot normal
+  de novo, confirmado 2x).
+- **Recuperação:** DTS revertido pro estado original (sem `aliases`/`stdout-path`),
+  recompilado, gravado via `fastboot flash cache` (não dependeu do Linux estar de pé —
+  crítico já que o device não respondia nem por serial nem USB gadget nesse estado).
+  Boot voltou ao normal, confirmado ao vivo.
+- **Para o futuro:** se alguém quiser reabrir isso, investigar primeiro se `uart_0` tem
+  suporte real a `earlycon` simultâneo com o console tardio nesse SoC (alguns UARTs MSM
+  exigem `no_console_suspend`/handoff explícito entre earlycon e o driver real — ver
+  `Documentation/admin-guide/kernel-parameters.txt` sobre `earlycon` + conflito de
+  ownership de MMIO), e testar em ambiente onde reverter não dependa de fastboot físico.
 
 ### 🔵 BUG-A7: `msm8953-motorola-sanders.dts` — `ts_reset` pinctrl definido mas não referenciado
 - **Arquivo:** `dts/msm8953-motorola-sanders.dts:413`
@@ -232,12 +238,10 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
   `gpio-hog` (sempre HIGH) porque o pulse curto do driver causava `-ETIMEDOUT` (comentado
   no DTS). O pinctrl `ts-reset-state` ficou como código morto/documentação.
 
-### 🔵 BUG-A8: gap de numeração de patches (0001, 0002, 0004 — sem 0003)
+### ✅ BUG-A8: gap de numeração de patches (0001, 0002, 0004 — sem 0003)
 - **Arquivo:** `kernel/`
 - **Gravidade:** 🔵 Baixa (cosmético)
-- **Status:** Aberto
-- **Descrição:** há 0001, 0002 e 0004; `02-build-kernel.sh` itera `000[0-9]*` então não
-  quebra, mas o gap confunde.
+- **Status:** ✅ **Corrigido (2026-09-03):** `0004-pmi8950-battery-charger-nodes.patch` renomeado para `0003-pmi8950-battery-charger-nodes.patch` (`git mv`, conteúdo idêntico — a checagem de idempotência do `02-build-kernel.sh` é por conteúdo via `git apply --check --reverse`, não por nome, então renomear não afeta a aplicação num tree já com o patch aplicado). Referência atualizada em `docs/ROADMAP_AND_TODOS.md`.
 
 ### 🔄 BUG-A9: `sanders-bt-mac.sh` — `set +e` global nunca restaurado
 - **Arquivo:** `rootfs-overlay/common/usr/local/bin/sanders-bt-mac.sh:95`
@@ -246,11 +250,10 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
   validação final com retry; falhas em `power off`/`public-addr`/`power on` são ignoradas
   propositalmente (btmgmt às vezes reporta erro mesmo aplicando). Não quebra o fluxo.
 
-### 🔵 BUG-A10: `09-extract-firmware.sh` — path do stock zip ainda com fallback hardcoded
+### ✅ BUG-A10: `09-extract-firmware.sh` — path do stock zip ainda com fallback hardcoded
 - **Arquivo:** `scripts/09-extract-firmware.sh:20-24`
 - **Gravidade:** 🔵 Baixa
-- **Status:** Aberto (parcialmente mitigado) — suporta override via `STOCK_ZIP` env, mas o
-  fallback default ainda é `/mnt/hdauxiliar/android/projeto_g5/stock/*.zip` (máquina do dev).
+- **Status:** ✅ **Corrigido (2026-09-03):** fallback trocado de path absoluto fixo (`/mnt/hdauxiliar/android/projeto_g5/stock/`) para `$REPO/../stock` (relativo ao submódulo via `lib.sh`), portável para qualquer clone do projeto que mantenha a mesma estrutura pai/submódulo. Override via `STOCK_ZIP` continua disponível.
 
 ---
 
@@ -265,10 +268,10 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 | **BUG-005** | `sanders-network-setup.sh` | Exposição de senha Wi-Fi em tabela de processos via `echo` | 🟡 Média | ✅ **Corrigido** (2026-09-02) — `wifi <SSID> -` pede senha via prompt oculto |
 | **BUG-006** | `wcn36xx` Patch 0002 | Limitação de throughput Wi-Fi a taxas HT (802.11n) sem VHT | 🔵 Baixa | Decisão / Fix |
 | **BUG-007** | `sanders-bt-mac.sh` | Falha de resolução do symlink `/dev/disk/by-partlabel/persist` | 🟠 Alta | ✅ **Corrigido** (2026-09-02) |
-| **BUG-008** | `sanders-bt-mac.service` | Race condition de D-Bus entre `btmgmt` e `bluetoothd` | 🟡 Média | Documentado |
+| **BUG-008** | `sanders-bt-mac.service` | Race condition de D-Bus entre `btmgmt` e `bluetoothd` | 🟡 Média | ✅ **Corrigido** (2026-09-03) |
 | **BUG-009** | `qcom-wdt` / Systemd | Reset forçado do SoC durante o modo de suspensão de energia (`s2idle`) | 🟠 Alta | ✅ **Corrigido, confirmado ao vivo** (2026-09-02) |
 | **BUG-010** | Kconfig / DT APCS | Ausência de driver APCS impede funcionamento do `cpufreq-dt` | 🟡 Média | Mapeado (Scaffolding) |
-| **BUG-011** | `sanders-timesync.sh` | Bloqueio por timeout se resolução DNS via `getent` for lenta | 🟡 Média | Documentado |
+| **BUG-011** | `sanders-timesync.sh` | Bloqueio por timeout se resolução DNS via `getent` for lenta | 🟡 Média | Melhorado (mensagem correta) — bloqueio bounded é aceito por design |
 | **BUG-012** | `sanders-server-setup.sh` | Risco de *partial upgrade* no Arch Linux ao usar `pacman -Sy` | 🟡 Média | ✅ **Corrigido** (2026-09-02) |
 
 ---

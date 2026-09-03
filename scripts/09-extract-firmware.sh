@@ -4,7 +4,7 @@
 #
 # Inputs:
 #   $STOCK_ZIP — caminho pro zip de retail flashfile (NON-HLOS.bin + fsg.mbn)
-#   (default: /mnt/hdauxiliar/android/projeto_g5/stock/SANDERS_RETAIL_*.zip)
+#   (default: $REPO/../stock/SANDERS_RETAIL_*.zip, relativo ao submodulo)
 #
 # Output: $REPO/firmware/ com:
 #   - wcnss.mdt + wcnss.bXX  (pronto firmware p/ remoteproc)
@@ -17,10 +17,14 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
 STOCK_ZIP="${STOCK_ZIP:-}"
+# Fallback relativo a $REPO (diretorio pai do submodulo), nao mais um path
+# absoluto fixo da maquina do dev original — funciona em qualquer clone
+# do projeto que mantenha essa mesma estrutura de diretorios pai/submodulo.
+STOCK_DIR_DEFAULT="$REPO/../stock"
 if [ -z "$STOCK_ZIP" ]; then
-    STOCK_ZIP=$(ls /mnt/hdauxiliar/android/projeto_g5/stock/SANDERS_RETAIL_*.zip 2>/dev/null | head -1 || true)
+    STOCK_ZIP=$(ls "$STOCK_DIR_DEFAULT"/SANDERS_RETAIL_*.zip 2>/dev/null | head -1 || true)
 fi
-[ -f "$STOCK_ZIP" ] || die "stock zip nao encontrado. Defina STOCK_ZIP=... ou ponha em /mnt/hdauxiliar/android/projeto_g5/stock/"
+[ -f "$STOCK_ZIP" ] || die "stock zip nao encontrado. Defina STOCK_ZIP=... ou ponha em $STOCK_DIR_DEFAULT/"
 
 check_cmd unzip
 check_cmd simg2img

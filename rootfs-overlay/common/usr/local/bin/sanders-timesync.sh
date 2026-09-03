@@ -21,17 +21,25 @@ if [ "$REACHABLE" -eq 1 ]; then
     timedatectl set-ntp true 2>/dev/null || true
     systemctl restart systemd-timesyncd 2>/dev/null || true
     
-    # Aguarda o alinhamento do relógio (até 15s)
+    # Aguarda o alinhamento do relógio (até 15s). Usa `timedatectl show
+    # -p NTPSynchronized --value` (saida estavel yes/no) em vez de
+    # parsear o texto de `timedatectl status` (formato pode variar
+    # entre versoes do systemd — BUG-A4).
+    SYNCED=0
     for _ in $(seq 1 15); do
-        SYNCED=$(timedatectl status 2>/dev/null | awk '/System clock synchronized: yes/ { found=1 } END { print found+0 }')
-        if [ "$SYNCED" -eq 1 ]; then
+        if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = "yes" ]; then
+            SYNCED=1
             break
         fi
         sleep 1
     done
-    
+
     NOW=$(date '+%Y-%m-%d %H:%M:%S %Z')
-    echo "[timesync] Relógio ajustado: $NOW"
+    if [ "$SYNCED" -eq 1 ]; then
+        echo "[timesync] Relógio ajustado: $NOW"
+    else
+        echo "[timesync] WARN: sync nao confirmado em 15s (timedatectl NTPSynchronized=no). Horario atual: $NOW" >&2
+    fi
 else
     echo "[timesync] WARN: Servidores NTP inalcançáveis. Mantendo horário atual de boot." >&2
 fi
