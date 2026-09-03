@@ -26,7 +26,13 @@ rm -rf "$MNT"
 mkdir -p "$MNT"
 
 case "$FLAVOR" in
-    headless) IMG_SIZE=3G ;;
+    # 3G ficou apertado demais pro headless assim que o sandbox do pacman
+    # (ver DisableSandbox* abaixo) passou a funcionar de verdade: um
+    # -Syu completo baixando as atualizacoes acumuladas da tarball base
+    # (glibc, systemd, gcc-libs, linux-firmware inteiro etc.) estourou
+    # "espaco livre em disco insuficiente" com 3G. Confirmado ao vivo
+    # 2026-09-03.
+    headless) IMG_SIZE=4G ;;
     desktop)  IMG_SIZE=6G ;;
 esac
 rm -f "$ROOTFS_IMG"
@@ -51,6 +57,22 @@ mkdir -p "$MNT/etc/systemd/system/multi-user.target.wants"
 #   "Public keyring not found; have you run 'pacman-key --init'?"
 # e nao consegue instalar pacote nenhum. Faz aqui pra deixar tudo pronto.
 if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+    # Pacman 7.1+ passou a rodar downloads/instalacao dentro de um
+    # sandbox baseado em Landlock LSM por padrao. Sob arch-chroot +
+    # qemu-user, se o kernel do HOST (nao o do device alvo) nao suporta
+    # Landlock, todo pacman -Sy* falha com "falha ao restringir acesso
+    # ao sistema de arquivos porque Landlock nao e suportado pelo
+    # kernel!" / "troca para usuario de isolamento alpm falhou!" — e
+    # como o build antigo so tratava isso com `|| warn`, o rootfs final
+    # saia SEM wpa_supplicant/samba/bluez/alsa-utils, silenciosamente
+    # "OK". Confirmado ao vivo 2026-09-03. Desabilita as duas flags do
+    # sandbox em pacman.conf antes de qualquer pacman -S* — nao afeta o
+    # sandbox do pacman que vai rodar de verdade no device (esse pacman.conf
+    # e so o do rootfs sendo construido, chroot no host de build).
+    sed -i \
+        -e 's/^#\(DisableSandboxFilesystem\)/\1/' \
+        -e 's/^#\(DisableSandboxSyscalls\)/\1/' \
+        "$MNT/etc/pacman.conf"
     msg "inicializando pacman keyring (via arch-chroot + qemu-aarch64)..."
     arch-chroot "$MNT" pacman-key --init >/dev/null 2>&1 || warn "pacman-key --init falhou"
     arch-chroot "$MNT" pacman-key --populate archlinuxarm >/dev/null 2>&1 \
@@ -89,7 +111,7 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
         iw wpa_supplicant dhcpcd wireless-regdb crda \
         samba terminus-font bluez bluez-utils \
         alsa-utils alsa-ucm-conf \
-        || warn "pacman -S pacotes base falhou"
+        || die "pacman -S pacotes base falhou"
 
     if [ "$FLAVOR" = "desktop" ]; then
         msg "instalando stack desktop (weston + xwayland + mesa) via arch-chroot..."
