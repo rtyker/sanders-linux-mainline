@@ -88,6 +88,7 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
     arch-chroot "$MNT" pacman -Syu --noconfirm --needed \
         iw wpa_supplicant dhcpcd wireless-regdb crda \
         samba terminus-font bluez bluez-utils \
+        alsa-utils alsa-ucm-conf \
         || warn "pacman -S pacotes base falhou"
 
     if [ "$FLAVOR" = "desktop" ]; then
@@ -306,6 +307,13 @@ if [ -d "$REPO/firmware" ] && ls "$REPO/firmware"/wcnss.* >/dev/null 2>&1; then
 else
     warn "diretorio firmware/ vazio — Wi-Fi nao funcionara"
     warn "Rode scripts/09-extract-firmware.sh para populá-lo"
+fi
+
+if [ -d "$REPO/firmware" ] && ls "$REPO/firmware"/adsp.* >/dev/null 2>&1; then
+    msg "instalando firmware ADSP (Hexagon QDSP6 audio) no rootfs..."
+    mkdir -p "$MNT/lib/firmware/qcom/msm8953"
+    cp "$REPO/firmware"/adsp.* "$MNT/lib/firmware/qcom/msm8953/"
+    cp "$REPO/firmware"/adsp.* "$MNT/lib/firmware/"
 fi
 
 # Keepalive do link USB: ping no host (10.42.0.1) a cada 60s.
