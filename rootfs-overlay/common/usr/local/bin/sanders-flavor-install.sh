@@ -61,8 +61,12 @@ flavor_xfce_install() {
     # /tmp sumia, xfconfd nunca subia). dbus-run-session mantem o
     # dbus-daemon como filho direto do processo em vez de daemonizar,
     # o que sobrevive normalmente dentro de um systemd service.
+    # Painel DSI e fisicamente portrait (1080x1920, connector "DSI-1" —
+    # confirmado ao vivo 2026-09-03 via `xrandr --query`). Gira pra
+    # paisagem por default antes de subir a sessao XFCE.
     cat > /usr/local/bin/sanders-xfce-xinitrc <<'EOF'
 #!/bin/sh
+xrandr --output DSI-1 --rotate left
 exec dbus-run-session -- startxfce4
 EOF
     chmod +x /usr/local/bin/sanders-xfce-xinitrc
