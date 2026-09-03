@@ -619,17 +619,24 @@
 
 &spmi_bus {
 	/*
-	 * codec@f000 estava sob pmic@1 (seguindo referencia de boards
-	 * msm8916/pm8916, onde o codec analogico vive na 2a USID do PMIC).
-	 * No potter/sanders (pm8953), a USID 1 nao tem driver bindado em
-	 * /sys/bus/spmi/devices/0-01 (sem erro no dmesg, sem deferred-probe
-	 * — silenciosamente sem probe, sugerindo falha de leitura SPMI /
-	 * nao ha chip fisico respondendo nessa USID). pmic@0 (USID 0, onde
-	 * adc/gpio/pon/rtc/temp-alarm ja probam OK) tem 0xf000 livre —
-	 * tentativa de mover o codec pra la. Confirmar contra o DTB de
-	 * fabrica antes de assumir que isso e definitivo.
+	 * CONFIRMADO no DTB de fabrica real (extraido do boot.img do stock
+	 * SANDERS_RETAIL_7.1.1, decodificado via unpack_bootimg.py +
+	 * qcdt_extract.py + dtc, 2026-09-03): o codec 8953_wcd_codec@f000
+	 * (compatible Android "qcom,msm8x16_wcd_codec") vive mesmo sob
+	 * "qcom,pm8953@1" — USID 1, EXATAMENTE como aqui. Os nomes de IRQ
+	 * batem 1:1 com os nossos (spk_cnp_int/spk_clip_int/spk_ocp_int/
+	 * ins_rem_det/but_press_det/mbhc_int em 0x1 0xf0 0x0..0x7).
+	 *
+	 * Uma tentativa anterior moveu isso pra pmic@0 (USID 0) porque
+	 * /sys/bus/spmi/devices/0-01 nao tinha driver bindado nesse kernel
+	 * mainline e pmic@0 "funcionava" — mas o DTB de fabrica prova que
+	 * isso estava errado: o hardware real TEM chip na USID 1, so o
+	 * nosso kernel mainline nao esta enumerando essa USID direito (bug
+	 * separado no lado do SPMI PMIC arbiter/mfd, nao um problema deste
+	 * DTS). Revertido pra pmic@1 — ver docs/AUDIO_SUBSYSTEM_PLAN.md
+	 * secao 4 pra investigacao completa da causa raiz da USID 1.
 	 */
-	pmic@0 {
+	pmic@1 {
 		wcd_codec: codec@f000 {
 			compatible = "qcom,pm8916-wcd-analog-codec";
 			reg = <0xf000 0x200>;
