@@ -6,6 +6,11 @@
 #
 # Este script carrega o lk2nd em RAM e em seguida envia o kernel mainline (boot-sanders.img)
 # para inicializacao imediata (~5s), sem realizar gravacao de rootfs no eMMC.
+#
+# NOTA: Como o lk2nd definitivo e a partição /boot (cache extlinux) já estão gravados no eMMC,
+# o aparelho dá boot autônomo sozinho. Use este script apenas para testar kernels em RAM
+# sem gravar na flash (override de desenvolvimento). Para atualizar o kernel no eMMC,
+# use '10-deploy-boot.sh' (via SSH ao vivo) ou '99-flash-rootfs-final.sh' (via Fastboot).
 
 source "$(dirname "$0")/lib.sh"
 check_cmd fastboot
