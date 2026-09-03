@@ -52,8 +52,15 @@ CONFIG_USB_U_ETHER=y
 # Controlador USB DWC3 (Qualcomm glue + core)
 CONFIG_USB_DWC3=y
 CONFIG_USB_DWC3_QCOM=y
+# DWC3_HOST/GADGET/DUAL_ROLE sao uma "choice" (mutuamente exclusivos) no
+# Kconfig. Precisamos de DUAL_ROLE (host + gadget simultaneos: CDC ACM/ECM
+# via cabo ao PC E adaptador USB-C Ethernet host mode standalone) — NAO
+# marcar GADGET=y junto, senao ele vence a choice e DUAL_ROLE e descartado
+# silenciosamente pelo olddefconfig (confirmado 2026-09-03: build gerou
+# USB_DWC3_GADGET=y em vez de DUAL_ROLE).
 CONFIG_USB_DWC3_DUAL_ROLE=y
-CONFIG_USB_DWC3_GADGET=y
+# CONFIG_USB_DWC3_HOST is not set
+# CONFIG_USB_DWC3_GADGET is not set
 
 # PHY USB 2.0 do msm8953 (qusb2). Defconfig deixa como modulo (=m), mas
 # como nao temos modprobe no initramfs, ele nunca carrega -> dwc3 fica
@@ -139,7 +146,10 @@ CONFIG_BT_BNEP=y
 # Acel/giro NAO estao em i2c — passam pela SSC/DSP (sem mainline pratico).
 CONFIG_IIO=y
 CONFIG_LTR501=y
-CONFIG_WCN36XX_DEBUG=y
+# Renomeado no kernel upstream (era CONFIG_WCN36XX_DEBUG); confirmado
+# 2026-09-03 que o nome antigo nao existe mais e era silenciosamente
+# ignorado pelo merge_config.
+CONFIG_WCN36XX_DEBUGFS=y
 
 # LED de notificacao frontal (MPP2 do pmi8950 via leds-gpio). Habilita
 # tambem o sysfs trigger pra heartbeat/timer/disk-activity etc.
