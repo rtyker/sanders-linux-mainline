@@ -1,0 +1,48 @@
+diff --git a/lk2nd/boot/extlinux.c b/lk2nd/boot/extlinux.c
+index 74c9f0e6..adfbb9ef 100644
+--- a/lk2nd/boot/extlinux.c
++++ b/lk2nd/boot/extlinux.c
+@@ -350,7 +350,7 @@ static char *normalize_path(const char *path, const char *root)
+ 	char tmp[256];
+ 
+ 	if (path[0] == '/')
+-		snprintf(tmp, sizeof(tmp), "%s/%s", root, path);
++		snprintf(tmp, sizeof(tmp), "%s%s", root, path);
+ 	else
+ 		snprintf(tmp, sizeof(tmp), "%s/extlinux/%s", root, path);
+ 
+@@ -476,7 +476,7 @@ extern void boot_linux(void *kernel, unsigned *tags,
+ 
+ #define IS_ARM64(ptr) (ptr->magic_64 == KERNEL64_HDR_MAGIC)
+ 
+-#define MAX_KERNEL_SIZE			(32 * 1024 * 1024)
++#define MAX_KERNEL_SIZE			(50 * 1024 * 1024)
+ #define MAX_TAGS_SIZE			(2 * 1024 * 1024)
+ #define MAX_RAMDISK_SIZE		(16 * 1024 * 1024)
+ 
+@@ -652,6 +652,10 @@ void lk2nd_try_extlinux(const char *root)
+ 
+ 	snprintf(path, sizeof(path), "%s/extlinux/extlinux.conf", root);
+ 	ret = fs_open_file(path, &fileh);
++	if (ret < 0) {
++		snprintf(path, sizeof(path), "%s/boot/extlinux/extlinux.conf", root);
++		ret = fs_open_file(path, &fileh);
++	}
+ 	if (ret < 0) {
+ 		dprintf(SPEW, "No extlinux config in %s: %d\n", root, ret);
+ 		return;
+diff --git a/platform/msm8953/platform.c b/platform/msm8953/platform.c
+index b80300f8..75f2c1a6 100644
+--- a/platform/msm8953/platform.c
++++ b/platform/msm8953/platform.c
+@@ -127,8 +127,8 @@ void platform_init_mmu_mappings(void)
+ 	uint32_t ddr_start = DDR_START;
+ 	uint32_t smem_addr = platform_get_smem_base_addr();
+ 
+-	/*Mapping the ddr start address for loading the kernel about 90 MB*/
+-	sections = 90;
++	/*Mapping the ddr start address for loading the kernel about 160 MB*/
++	sections = 160;
+ 	while(sections--)
+ 	{
+ 		arm_mmu_map_section(ddr_start + sections * MB, ddr_start + sections* MB, COMMON_MEMORY);
