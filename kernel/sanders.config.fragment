@@ -185,6 +185,37 @@ CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
 CONFIG_BRIDGE=y
 CONFIG_BRIDGE_NETFILTER=y
 CONFIG_VETH=y
+# xt_addrtype/xt_MASQUERADE — dockerd monta a chain "DOCKER" na tabela
+# nat-PREROUTING via `iptables -m addrtype --dst-type LOCAL -j DOCKER`.
+# Sem esses builtin, dockerd falha em "Extension addrtype revision 0 not
+# supported, missing kernel module?" no register do bridge driver.
+# Confirmado ao vivo em 2026-09-03 apos resolver o bloqueio NF_TABLES:
+# nftables ja inicializava, mas essa regra especifica ainda faltava.
+# Igual ao WCN36XX, precisa =y (nao =m): esse kernel nao roda
+# `make modules_install` nem tem /lib/modules pro build, entao qualquer
+# CONFIG=m vira uma feature morta sem modprobe possivel.
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_NETFILTER_XT_TARGET_MASQUERADE=y
+CONFIG_NETFILTER_XT_MATCH_MULTIPORT=y
+CONFIG_NETFILTER_XT_MARK=y
+CONFIG_NETFILTER_XT_TARGET_MARK=y
+# NFT_COMPAT — camada real que faz o binario "iptables-nft" (o que o
+# Docker usa) traduzir regras x_tables (addrtype, MASQUERADE, etc.) para
+# nf_tables. Sem isso as extensoes xt_* ficam com CONFIG=y mas o kernel
+# nao tem como registra-las no nft compat, e o userspace erra com
+# "Extension addrtype revision 0 not supported, missing kernel module?"
+# mesmo com xt_addrtype builtin. Confirmado ao vivo 2026-09-03: setar
+# so os matches/targets xt_* nao bastou, faltava este.
+CONFIG_NFT_COMPAT=y
+
+# OverlayFS — driver de storage padrao do Docker/containerd
+# (overlayfs snapshotter). Defconfig deixa =m, mas sem /lib/modules
+# nesse kernel (02-build-kernel.sh nao roda modules_install) vira
+# feature morta: "mount source: overlay ... err: no such device".
+# Confirmado ao vivo 2026-09-03 apos resolver NFT_COMPAT: `docker run
+# hello-world` puxou a imagem certinho (prova que rede/NAT funcionam)
+# mas falhou no mount do overlay do container.
+CONFIG_OVERLAY_FS=y
 
 # CPU Frequency Scaling & Governors (cpufreq) — Kconfig scaffolding, ja
 # vinha =y por default no defconfig; explicito aqui so por clareza.
