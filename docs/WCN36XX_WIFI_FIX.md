@@ -30,18 +30,47 @@ A estratégia preparada para teste é **forçar o uso da API V0** (legada) para 
 - Para `RF_IRIS_WCN3680`, os wrappers selecionam V0 e continuam pelo caminho comum de resposta e `mutex_unlock`.
 - Não há alteração de estrutura em `hal.h`, MAC fixo ou edição persistente da árvore efêmera do kernel.
 
-### Validação necessária no aparelho
-Depois de gerar e inicializar a nova imagem, coletar:
+### Validação realizada no aparelho (2026-09-03)
+Testado ao vivo no hardware real com o kernel 7.1.0-rc4 (`#29`) e rede real `prfelicidade` (2.4 GHz, canal 7, -27 dBm):
 
-```sh
-dmesg -w
-iw dev wlan0 scan
-wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf
-iw dev wlan0 link
-dmesg | grep -E 'wcn36xx|MEM_FAIL|4WAY|deauth'
+```text
+# 1. Varredura e Associação:
+wlan0: SME: Trying to authenticate with 6a:fa:c4:ea:34:9c (SSID='prfelicidade' freq=2442 MHz)
+wlan0: Trying to associate with 6a:fa:c4:ea:34:9c (SSID='prfelicidade' freq=2442 MHz)
+wlan0: Associated with 6a:fa:c4:ea:34:9c
+
+# 2. Recepção Over-the-Air:
+wlan0: Event EAPOL_RX (23) received
+wlan0: RX EAPOL from 6a:fa:c4:ea:34:9c (encrypted=1)
+RX EAPOL - hexdump(len=99): 02 03 00 5f 02 00 8a 00 10 ...
+
+# 3. Bloqueio no driver:
+wcn36xx: WARNING hal config bss response failure: 5
+wcn36xx: ERROR hal_config_bss response failed err=-5
+wlan0: Not associated - Delay processing of received EAPOL frame (state=ASSOCIATING)
+wlan0: CTRL-EVENT-DISCONNECTED bssid=6a:fa:c4:ea:34:9c reason=15
 ```
 
-Critério de sucesso: associação WPA2 concluída, endereço IP obtido e ausência de `hal_config_bss/sta ... failure: 5`. Se o `MEM_FAIL=5` permanecer, o patch deve ser revertido como hipótese falsificada e a investigação deve retornar ao protocolo HAL/firmware.
+### 🔬 Conclusão Técnica da Validação
+1. **Hardware RF / Demodulador / RX de Pacotes:** Estão **100% funcionais**. O chip sintoniza o canal correto e recebe os pacotes de handshake EAPOL enviados pelo roteador pelo ar.
+2. **Falsificação da Hipótese de Fallback V0 Puro:**
+   * A tentativa de simplesmente forçar `wcn36xx_smd_config_bss_v0()` **não solucionou** o `MEM_FAIL=5`. A firmware Pronto 1.5.1.2 rejeitou a mensagem V0 do BSS exatamente com o mesmo código de erro 5.
+   * Por causa dessa rejeição, o driver não notifica o subsistema `cfg80211` de que o link BSS está estabelecido. Consequentemente, o `wpa_supplicant` mantém a interface em estado `ASSOCIATING`, atrasa o processamento do pacote EAPOL recebido e sofre timeout (`reason=15=4WAY_HANDSHAKE_TIMEOUT`).
 
 ---
-*Documentação gerada automaticamente pela Gemini CLI em 2026-05-21.*
+
+## 🎯 Roteiro para a Próxima Fase do Wi-Fi
+
+Para futuras sessões focadas na resolução definitiva do Wi-Fi, os caminhos técnicos mapeados são:
+
+1. **Investigação do Formato Híbrido V1 / V0:**
+   * O Pronto v3 (`qcom,pronto-v3-pil`) possui definições com `#define WCN36XX_DIFF_BSS_PARAMS_V1_NOVHT`.
+   * Testar se a firmware 1.5.1.2 espera a mensagem BSS no formato `V1` com tamanho reduzido (`NOVHT`) em vez de `V0` puro.
+2. **Comparação Byte-a-Byte com o Driver CAF Stock (Android 3.18 / Prima):**
+   * Extrair a `struct hal_config_bss_req_msg` do kernel CAF da Motorola (`drivers/net/wireless/wcnss/wcnss_wlan.c` e `wcnss_v1.c` da árvore stock do sanders/potter).
+   * Comparar o alinhamento de memória (`sizeof`), campos adicionados/removidos e a ordem das structs de BSS e STA.
+3. **Alternativa via Firmware alternativa de outro device MSM8953:**
+   * Testar arquivos `wcnss.mdt` / `wcnss.b*` extraídos de outros aparelhos Snapdragon 625 com mainline maduro (ex: Xiaomi Redmi 4X / `santoni` ou Xiaomi Mi A1 / `tissot`), que utilizam firmwares Pronto com suporte V1/VHT estável.
+4. **Modo Operacional Atual do Servidor:**
+   * Até que o handshake WPA2 seja sanado, a rede standalone recomendada para o servidor é via adaptador USB Ethernet (OTG) ou USB ECM (`10.42.0.2`).
+
