@@ -3,7 +3,7 @@
 Procedimento para compilar, carregar e persistir o **lk2nd** (Little Kernel 2nd stage) no Moto G5s Plus (`sanders`) e Moto G5 Plus (`potter`).
 
 > 🚀 **STATUS DE DEPLOY:** A gravação permanente do `lk2nd` na partição `boot` do eMMC está **concluída e validada**. O bootloader stock da Motorola (ABOOT) chainloadeia o `lk2nd` automaticamente no cold boot.
-> Veja os detalhes completos em [`docs/AUTONOMOUS_DIRECT_BOOT_PLAN.md`](../../docs/AUTONOMOUS_DIRECT_BOOT_PLAN.md).
+> Veja os detalhes completos em [`docs/AUTONOMOUS_DIRECT_BOOT_PLAN.md`](../../docs/archived/AUTONOMOUS_DIRECT_BOOT_PLAN.md).
 
 ---
 
