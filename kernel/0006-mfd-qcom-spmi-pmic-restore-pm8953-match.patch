@@ -1,0 +1,12 @@
+diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
+index b4b178caf..2dc3e46b5 100644
+--- a/drivers/mfd/qcom-spmi-pmic.c
++++ b/drivers/mfd/qcom-spmi-pmic.c
+@@ -56,6 +56,7 @@ static const struct of_device_id pmic_spmi_id_table[] = {
+ 	{ .compatible = "qcom,pm8937", .data = N_USIDS(2) },
+ 	{ .compatible = "qcom,pm8941", .data = N_USIDS(2) },
+ 	{ .compatible = "qcom,pm8950", .data = N_USIDS(2) },
++	{ .compatible = "qcom,pm8953", .data = N_USIDS(2) },
+ 	{ .compatible = "qcom,pm8994", .data = N_USIDS(2) },
+ 	{ .compatible = "qcom,pm8998", .data = N_USIDS(2) },
+ 	{ .compatible = "qcom,pma8084", .data = N_USIDS(2) },
