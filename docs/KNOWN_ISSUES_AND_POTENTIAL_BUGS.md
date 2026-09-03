@@ -89,7 +89,7 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 ---
 
 ### 🔵 BUG-006: Limitação de Throughput Wi-Fi (Trade-off 802.11n vs 802.11ac)
-- **Arquivo:** [`kernel/0002-wcn36xx-force-v0-for-wcn3680.patch`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/kernel/0002-wcn36xx-force-v0-for-wcn3680.patch)
+- **Arquivo:** [`kernel/0002-wcn36xx-wcn3680-novht-fallback.patch`](file:///mnt/hdauxiliar/android/projeto_g5/sanders-linux-mainline/kernel/0002-wcn36xx-wcn3680-novht-fallback.patch)
 - **Gravidade:** 🔵 **Baixa (Informativa / Trade-off)**
 - **Sintoma:** O Wi-Fi não atinge taxas de transferência VHT (802.11ac 5GHz), ficando limitado a no máximo ~150 Mbps (modo HT40).
 - **Causa Raiz:** O patch força as estruturas de dados HAL para o formato `v0` (802.11n legada) quando o chip identificado é o `RF_IRIS_WCN3680`. Isso é necessário para evitar a rejeição de memória `MEM_FAIL=5` na firmware stock `1.5.1.2`, mas desativa a pilha VHT/802.11ac.

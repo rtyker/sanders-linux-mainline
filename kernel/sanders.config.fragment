@@ -26,6 +26,20 @@ CONFIG_DRM_SIMPLEDRM=y
 # FBDEV emulado pelo DRM (mantem /dev/fb0 funcional pro fbcon do tty1).
 CONFIG_DRM_FBDEV_EMULATION=y
 CONFIG_DRM_FBDEV_OVERALLOC=100
+# DRM MSM nativo (Display Subsystem MDSS / MDP5 / DSI / DSI-PHY-14nm)
+# Dependencias diretas do DRM_MSM que precisam ser builtin pra nao restringi-lo a modulo (=m):
+CONFIG_QCOM_OCMEM=y
+CONFIG_QCOM_LLCC=y
+CONFIG_SND_SOC=y
+CONFIG_DRM_MSM=y
+CONFIG_DRM_MSM_MDP5=y
+CONFIG_DRM_MSM_DSI=y
+CONFIG_DRM_MSM_DSI_14NM_PHY=y
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+CONFIG_BACKLIGHT_QCOM_WLED=y
+CONFIG_REGULATOR_QCOM_LABIBB=y
+CONFIG_DRM_PANEL_BOE_BS052FHM_A00_6C01=y
+CONFIG_DRM_PANEL_TIANMA_TL052VDXP02=y
 # Fonte grande pra display 1080x1920 portrait (16x32 = ~60 colunas legiveis).
 # Selecionada via cmdline `fbcon=font:TER16x32`.
 CONFIG_FONTS=y

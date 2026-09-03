@@ -417,6 +417,21 @@
 		bias-pull-up;
 		output-high;
 	};
+
+	pmx_mdss_default: pmx-mdss-default-state {
+		pins = "gpio61";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable;
+		output-high;
+	};
+
+	pmx_mdss_sleep: pmx-mdss-sleep-state {
+		pins = "gpio61";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
 };
 
 &usb3 {
@@ -499,6 +514,60 @@
 &pmi8950_fg {
 	monitored-battery = <&battery>;
 	power-supplies = <&pmi8950_smbcharger>;
+	status = "okay";
+};
+
+/*
+ * Painel MIPI-DSI nativo (Moto G5 Plus / potter / sanders)
+ *
+ * O lk2nd detecta o painel de fabrica no boot e atualiza dinamicamente
+ * o compatible "motorola,potter-panel" para "tianma,tl052vdxp02" ou
+ * "boe,bs052fhm-a00-6c01" dependendo do hardware fisico instalado.
+ */
+&mdss {
+	status = "okay";
+};
+
+&mdp {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	vdda-supply = <&pm8953_s3>;
+	vddio-supply = <&pm8953_l6>;
+
+	status = "okay";
+
+	panel: panel@0 {
+		compatible = "motorola,potter-panel", "tianma,tl052vdxp02";
+		reg = <0>;
+
+		backlight = <&pmi8950_wled>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&pmx_mdss_default>;
+		pinctrl-1 = <&pmx_mdss_sleep>;
+
+		reset-gpios = <&tlmm 61 GPIO_ACTIVE_LOW>;
+
+		vsp-supply = <&lab>;
+		vsn-supply = <&ibb>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	vcca-supply = <&pm8953_l3>;
 	status = "okay";
 };
 
