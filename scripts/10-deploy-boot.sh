@@ -48,6 +48,12 @@ ssh -o StrictHostKeyChecking=no "root@$TARGET_IP" '
     set -e
     MNT="/mnt_boot_tmp"
     mkdir -p "$MNT"
+    # Idempotencia: se uma execucao anterior falhou entre o mount e o
+    # umount (ex.: conexao SSH caiu no meio), o device fica montado e o
+    # proximo "mount" aqui falharia com "already mounted". Desmonta
+    # primeiro se for o caso, para o script sempre poder ser reexecutado
+    # com seguranca sem intervencao manual.
+    mountpoint -q "$MNT" && { umount -f "$MNT" 2>/dev/null || umount -l "$MNT"; }
     mount /dev/mmcblk0p52 "$MNT"
     
     mkdir -p "$MNT/boot/extlinux"
