@@ -1,21 +1,42 @@
 #!/bin/bash
-# Instalador de "flavors" pos-deploy — roda num sistema JA instalado e
-# rodando (nao em build time, diferente do FLAVOR=headless|desktop do
-# 05-build-rootfs.sh). Cada flavor e um set de pacotes + config opcional
-# que o usuario liga sob demanda, depois que a base (kernel, SSH, rede)
-# ja esta pronta.
+# Ponto UNICO de entrada pos-deploy pra escolher o "flavor" do sistema —
+# roda num sistema JA instalado e rodando (nao em build time; o
+# FLAVOR=headless|desktop do 05-build-rootfs.sh so decide o que vai
+# embutido na imagem inicial, hoje so wifi/ssh/samba/bluez/alsa base).
+# Cada flavor e um set de pacotes + config + servicos que o usuario liga
+# sob demanda, depois que a base (kernel, SSH, rede) ja esta pronta.
 #
 # Uso:
 #   sanders-flavor-install.sh list              # lista flavors disponiveis
 #   sanders-flavor-install.sh <flavor>           # instala e habilita
 #   sanders-flavor-install.sh <flavor> --remove  # desabilita (nao desinstala pacotes)
 #
-# Flavors disponiveis: xfce, xorg-minimal, wayland-minimal
+# Flavors disponiveis: minimal, server, xorg, weston-minimal, xfce
+#
+# Reorganizado em 2026-09-04 (antes: "server" vivia so em
+# sanders-server-setup.sh, "minimal" nao existia como opcao explicita, e
+# os flavors graficos se chamavam xorg-minimal/wayland-minimal). Nomes
+# antigos (xorg-minimal, wayland-minimal) continuam aceitos como alias
+# com aviso de depreciacao — nao quebra scripts/memoria de quem já usava.
 
 set -euo pipefail
 
 FLAVOR="${1:-}"
 ACTION="${2:---install}"
+
+# Nomes antigos (pre-reorganizacao) -> nomes atuais. Mantido pra nao
+# quebrar quem digitar de cabeca o nome antigo ou tiver isso documentado
+# em algum lugar externo a este repo.
+case "$FLAVOR" in
+    xorg-minimal)
+        echo "[aviso] 'xorg-minimal' foi renomeado para 'xorg' — use o novo nome a partir de agora." >&2
+        FLAVOR=xorg
+        ;;
+    wayland-minimal)
+        echo "[aviso] 'wayland-minimal' foi renomeado para 'weston-minimal' — use o novo nome a partir de agora." >&2
+        FLAVOR=weston-minimal
+        ;;
+esac
 
 # Painel DSI e fisicamente portrait (1080x1920, connector "DSI-1" — via
 # DRM_MSM, confirmado ao vivo 2026-09-03 com `xrandr --query`). Usado
@@ -23,10 +44,12 @@ ACTION="${2:---install}"
 DSI_CONNECTOR="DSI-1"
 
 list_flavors() {
-    echo "Flavors disponiveis (todos com teclas de Volume Up/Down -> PipeWire habilitadas):"
-    echo "  xfce             — Xorg + XFCE4 (desktop leve via X11, tty1) + x11vnc (:5900)"
-    echo "  xorg-minimal     — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900) [FALLBACK — Xorg trava o painel DSI em alguns casos, prefira wayland-minimal]"
-    echo "  wayland-minimal  — Weston (compositor Wayland minimo, sem shell/painel extra) com GPU real (freedreno), backend VNC nativo (:5900) [PREFERENCIAL]"
+    echo "Flavors disponiveis:"
+    echo "  minimal          — apenas diagnostico, nenhum pacote instalado (roda sanders-server-setup.sh --status)"
+    echo "  server           — ferramentas basicas de servidor: htop, git, curl, vim, fastfetch, docker (instalado mas NUNCA habilitado por padrao), bluez-utils"
+    echo "  xorg             — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900) + teclas de Volume -> PipeWire [FALLBACK — Xorg trava o painel DSI em alguns casos, prefira weston-minimal]"
+    echo "  weston-minimal   — Weston (compositor Wayland minimo, sem shell/painel extra) com GPU real (freedreno), backend VNC nativo (:5900) + teclas de Volume -> PipeWire [PREFERENCIAL]"
+    echo "  xfce             — Xorg + XFCE4 (desktop leve via X11, tty1) + x11vnc (:5900) + teclas de Volume -> PipeWire"
 }
 
 pacman_install() {
@@ -36,11 +59,11 @@ pacman_install() {
     pacman -Syu --noconfirm --needed "$@"
 }
 
-# --- Helper compartilhado: x11vnc (usado por xfce e xorg-minimal) ----------
+# --- Helper compartilhado: x11vnc (usado por xfce e xorg) ----------
 #
 # Generico de proposito — nao tem Requires= fixo numa unit de flavor
 # especifica. Assim funciona com qualquer sessao X11 que suba em :0,
-# nao importa qual flavor (xfce ou xorg-minimal) esta ativo no momento;
+# nao importa qual flavor (xfce ou xorg) esta ativo no momento;
 # so fica tentando reconectar (Restart=on-failure) ate a sessao aparecer.
 setup_x11vnc_service() {
     local tag="$1"
@@ -70,7 +93,7 @@ After=graphical.target
 [Service]
 User=root
 # XAUTHORITY fixo (nao o -auth aleatorio do startx) — os flavors X11
-# (xfce, xorg-minimal) tambem apontam pra esse mesmo arquivo, entao o
+# (xfce, xorg) tambem apontam pra esse mesmo arquivo, entao o
 # x11vnc consegue se autenticar contra o display :0 sem precisar
 # descobrir o cookie. Sem Requires= numa unit especifica de flavor —
 # fica retentando (Restart=on-failure) ate a sessao X aparecer,
@@ -136,6 +159,42 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable --now sanders-volume-keys.service
+}
+
+# --- Flavor: minimal ---------------------------------------------------------
+#
+# Nao instala pacote nenhum de proposito — e o estado "cru" logo apos o
+# build headless (kernel, SSH, rede ja prontos, mais nada). Existe como
+# flavor explicito so pra ter um comando unico de diagnostico e pra
+# documentar que "nao fazer nada" e uma escolha valida, nao um estado
+# intermediario esquecido.
+
+flavor_minimal_install() {
+    echo "[flavor:minimal] Nenhum pacote instalado — apenas diagnostico."
+    /usr/local/bin/sanders-server-setup.sh --status
+}
+
+flavor_minimal_remove() {
+    echo "[flavor:minimal] Nao ha nada a desabilitar (flavor sem servicos/pacotes proprios)."
+}
+
+# --- Flavor: server ------------------------------------------------------------
+#
+# Ferramentas basicas de linha de comando pra uso como servidor headless
+# (sem sessao grafica). A mecanica real (lista de pacotes + relatorio de
+# diagnostico) vive em sanders-server-setup.sh — mantido como script
+# separado porque tambem e util standalone (`--status` sem reinstalar
+# nada); este flavor so e a porta de entrada unificada.
+
+flavor_server_install() {
+    echo "[flavor:server] Instalando ferramentas basicas de servidor..."
+    /usr/local/bin/sanders-server-setup.sh --install
+}
+
+flavor_server_remove() {
+    echo "[flavor:server] Este flavor nao tem servico proprio pra desabilitar"
+    echo "(htop/git/curl/vim/fastfetch/docker/bluez-utils continuam instalados —"
+    echo "remova pacotes individuais via 'pacman -R <pacote>' se quiser)."
 }
 
 # --- Flavor: xfce -----------------------------------------------------------
@@ -221,7 +280,7 @@ flavor_xfce_remove() {
     systemctl enable --now getty@tty1.service 2>/dev/null || true
 }
 
-# --- Flavor: xorg-minimal ----------------------------------------------------
+# --- Flavor: xorg -------------------------------------------------------------
 #
 # So Xorg + xterm, sem gerenciador de janelas nem desktop nenhum — pra
 # desenvolver/testar seu proprio app grafico direto, sem overhead de
@@ -229,13 +288,13 @@ flavor_xfce_remove() {
 # app deve subir sozinho no lugar dele).
 
 flavor_xorgmin_install() {
-    echo "[flavor:xorg-minimal] Instalando Xorg minimo..."
+    echo "[flavor:xorg] Instalando Xorg minimo..."
     pacman_install \
         xorg-server xorg-xinit xorg-xrandr \
         xf86-input-libinput \
         xterm
 
-    echo "[flavor:xorg-minimal] Escrevendo xinitrc..."
+    echo "[flavor:xorg] Escrevendo xinitrc..."
     cat > /usr/local/bin/sanders-xorgmin-xinitrc <<EOF
 #!/bin/sh
 xrandr --output $DSI_CONNECTOR --rotate left
@@ -246,13 +305,13 @@ exec xterm -fa Monospace -fs 14
 EOF
     chmod +x /usr/local/bin/sanders-xorgmin-xinitrc
 
-    setup_x11vnc_service "flavor:xorg-minimal"
-    setup_volume_keys_service "flavor:xorg-minimal"
+    setup_x11vnc_service "flavor:xorg"
+    setup_volume_keys_service "flavor:xorg"
 
-    echo "[flavor:xorg-minimal] Instalando unit systemd (tty1)..."
+    echo "[flavor:xorg] Instalando unit systemd (tty1)..."
     cat > /etc/systemd/system/sanders-xorg-minimal.service <<'EOF'
 [Unit]
-Description=Xorg minimo + xterm (sanders flavor: xorg-minimal)
+Description=Xorg minimo + xterm (sanders flavor: xorg)
 After=systemd-user-sessions.service
 Conflicts=getty@tty1.service weston.service phosh.service sanders-xfce.service sanders-weston-minimal.service
 
@@ -272,21 +331,21 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    echo "[flavor:xorg-minimal] Instalado, mas NADA habilitado automaticamente ainda. Pra ligar:"
+    echo "[flavor:xorg] Instalado, mas NADA habilitado automaticamente ainda. Pra ligar:"
     echo "  systemctl disable --now getty@tty1.service"
     echo "  systemctl enable --now sanders-xorg-minimal.service"
     echo "  systemctl enable --now sanders-x11vnc.service # acesso remoto VNC, porta 5900"
 }
 
 flavor_xorgmin_remove() {
-    echo "[flavor:xorg-minimal] Desabilitando..."
+    echo "[flavor:xorg] Desabilitando..."
     systemctl disable --now sanders-xorg-minimal.service 2>/dev/null || true
     systemctl disable --now sanders-x11vnc.service 2>/dev/null || true
     systemctl disable --now sanders-volume-keys.service 2>/dev/null || true
     systemctl enable --now getty@tty1.service 2>/dev/null || true
 }
 
-# --- Flavor: wayland-minimal (Weston) ---------------------------------------
+# --- Flavor: weston-minimal (Weston) ----------------------------------------
 #
 # Weston puro, sem shell/painel de desktop extra, com o backend VNC
 # NATIVO dele (nao x11vnc — Wayland nao e X11). Diferenca importante:
@@ -298,7 +357,7 @@ flavor_xorgmin_remove() {
 # /etc/pam.d/weston-remote-access necessario, nada a configurar aqui.
 
 flavor_westonmin_install() {
-    echo "[flavor:wayland-minimal] Instalando Weston..."
+    echo "[flavor:weston-minimal] Instalando Weston..."
     # neatvnc: dependencia opcional do weston pro backend VNC funcionar
     # de verdade — sem ela o "weston --backends=drm-backend.so,vnc-backend.so"
     # falha ao carregar o modulo VNC. seatd: weston moderno usa libseat
@@ -313,12 +372,12 @@ flavor_westonmin_install() {
     # restarting" — confirmado ao vivo 2026-09-04.
     pacman_install weston neatvnc seatd xorg-xwayland
 
-    echo "[flavor:wayland-minimal] Habilitando seatd..."
+    echo "[flavor:weston-minimal] Habilitando seatd..."
     systemctl enable --now seatd.service
 
-    setup_volume_keys_service "flavor:wayland-minimal"
+    setup_volume_keys_service "flavor:weston-minimal"
 
-    echo "[flavor:wayland-minimal] Escrevendo weston.ini..."
+    echo "[flavor:weston-minimal] Escrevendo weston.ini..."
     mkdir -p /root/.config
     cat > /root/.config/weston.ini <<EOF
 [core]
@@ -338,14 +397,14 @@ name=vnc
 mode=1920x1080
 EOF
 
-    echo "[flavor:wayland-minimal] Instalando unit systemd (tty1, backends drm+vnc simultaneos)..."
+    echo "[flavor:weston-minimal] Instalando unit systemd (tty1, backends drm+vnc simultaneos)..."
     # --disable-transport-layer-security: sem isso o backend VNC exige
     # TLS (certificado auto-assinado ou fornecido) — pra manter simples
     # e consistente com o x11vnc dos outros flavors (tambem sem TLS,
     # mesma postura de seguranca — uso pretendido e rede local/confiavel).
     cat > /etc/systemd/system/sanders-weston-minimal.service <<'EOF'
 [Unit]
-Description=Weston minimo (Wayland) + backend VNC nativo (sanders flavor: wayland-minimal)
+Description=Weston minimo (Wayland) + backend VNC nativo (sanders flavor: weston-minimal)
 After=systemd-user-sessions.service seatd.service
 Wants=seatd.service
 Conflicts=getty@tty1.service weston.service phosh.service sanders-xfce.service sanders-xorg-minimal.service
@@ -380,16 +439,16 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    echo "[flavor:wayland-minimal] Instalado, mas NAO habilitado automaticamente. Pra ligar:"
+    echo "[flavor:weston-minimal] Instalado, mas NAO habilitado automaticamente. Pra ligar:"
     echo "  systemctl disable --now getty@tty1.service"
     echo "  systemctl enable --now sanders-weston-minimal.service"
-    echo "[flavor:wayland-minimal] Acesso remoto: VNC na porta 5900, login = usuario 'root' + senha local do sistema"
+    echo "[flavor:weston-minimal] Acesso remoto: VNC na porta 5900, login = usuario 'root' + senha local do sistema"
     echo "(PAM via /etc/pam.d/weston-remote-access, ja vem com o pacote weston). SEM TLS — rede local/confiavel apenas."
-    echo "[flavor:wayland-minimal] Lembrete: a saida VNC e uma tela VIRTUAL separada, nao espelha a tela fisica."
+    echo "[flavor:weston-minimal] Lembrete: a saida VNC e uma tela VIRTUAL separada, nao espelha a tela fisica."
 }
 
 flavor_westonmin_remove() {
-    echo "[flavor:wayland-minimal] Desabilitando..."
+    echo "[flavor:weston-minimal] Desabilitando..."
     systemctl disable --now sanders-weston-minimal.service 2>/dev/null || true
     systemctl disable --now sanders-volume-keys.service 2>/dev/null || true
     systemctl enable --now getty@tty1.service 2>/dev/null || true
@@ -401,19 +460,31 @@ case "$FLAVOR" in
     list|"")
         list_flavors
         ;;
+    minimal)
+        case "$ACTION" in
+            --remove) flavor_minimal_remove ;;
+            *)        flavor_minimal_install ;;
+        esac
+        ;;
+    server)
+        case "$ACTION" in
+            --remove) flavor_server_remove ;;
+            *)        flavor_server_install ;;
+        esac
+        ;;
     xfce)
         case "$ACTION" in
             --remove) flavor_xfce_remove ;;
             *)        flavor_xfce_install ;;
         esac
         ;;
-    xorg-minimal)
+    xorg)
         case "$ACTION" in
             --remove) flavor_xorgmin_remove ;;
             *)        flavor_xorgmin_install ;;
         esac
         ;;
-    wayland-minimal)
+    weston-minimal)
         case "$ACTION" in
             --remove) flavor_westonmin_remove ;;
             *)        flavor_westonmin_install ;;

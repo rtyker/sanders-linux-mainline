@@ -81,9 +81,28 @@ install_packages() {
         # a db sem atualizar o que ja esta instalado (partial upgrade),
         # podendo puxar uma lib nova (glibc/openssl) incompativel com
         # binarios antigos do sistema. Risco real aqui, nao so no build.
+        # fastfetch, nao neofetch: o pacote neofetch foi removido dos
+        # repositorios oficiais do Arch (upstream descontinuado,
+        # substituido pelo fork ativo fastfetch). Com "neofetch" na
+        # lista, o pacman inteiro falhava em "error: target not found"
+        # ANTES de instalar qualquer coisa (resolucao de dependencias
+        # acontece pra todos os alvos de uma vez) — confirmado ao vivo
+        # 2026-09-04.
+        #
+        # Sem podman (decidido 2026-09-04, docker ja cobre o caso de uso
+        # de containers, nao precisa dos dois) nem tmux (decidido
+        # 2026-09-04, sem necessidade real pra este uso).
         pacman -Syu --noconfirm --needed \
-            htop tmux git curl neofetch podman docker bluez-utils \
+            htop git curl vim fastfetch docker bluez-utils \
             || echo "[sanders-server] WARN: falha instalando alguns pacotes via pacman"
+
+        # docker fica instalado mas NUNCA habilitado por padrao — este e o
+        # flavor "server" headless, nao deve subir o daemon de containers
+        # sozinho no boot. `disable` aqui e so idempotencia/documentacao
+        # explicita da intencao (a instalacao via pacman ja nao habilita
+        # nada sozinha); use `systemctl enable --now docker` manualmente
+        # quando de fato for usar.
+        systemctl disable docker.service >/dev/null 2>&1 || true
 
     else
         echo "[sanders-server] ERRO: gerenciador de pacotes pacman não encontrado" >&2
