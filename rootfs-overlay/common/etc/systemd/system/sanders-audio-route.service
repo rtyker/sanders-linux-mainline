@@ -1,0 +1,15 @@
+[Unit]
+Description=Aplica rota DAPM do alto-falante (Moto G5s Plus / potter)
+# Depois do alsa-restore.service para nao ser sobrescrito por um
+# asound.state desatualizado, e antes de qualquer app de audio.
+After=alsa-restore.service sound.target
+Wants=alsa-restore.service
+ConditionPathExists=/proc/asound/cards
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanders-audio-route.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
