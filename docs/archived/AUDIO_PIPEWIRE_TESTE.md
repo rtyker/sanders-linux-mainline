@@ -106,7 +106,30 @@ Diferente do bug do `alsaucm`, que falha mesmo pedindo explicitamente.
 
 ---
 
-## 6. Pendências se isso virar o caminho padrão
+## 6. Observação: volume mais baixo que o caminho `hw:0,0` direto
+
+O usuário notou que o som via PipeWire (mesmo com sink a 100% e RX
+Digital Volume em 90) ficou **mais baixo** do que o teste anterior via
+`hw:0,0` direto com `RX{1,2,3} Digital Volume=50` (`AUDIO_RESOLVIDO_SOM_AUDIVEL.md`).
+Não investigado ainda — hipóteses para a próxima sessão:
+- Resample/downmix do PipeWire (`s24-32le 1ch` no sink, WAV de entrada é
+  stereo 16-bit — pode estar fazendo um downmix mono com perda de nível).
+- `Volume: mono` no `pactl list sinks` sugere que o sink está em 1
+  canal só (`1ch` aparece no `pactl list sinks short` também) — a
+  rota `SectionDevice."Speaker"` no `HiFi.conf` já declara
+  `PlaybackChannels 1`, então isso é esperado, mas pode estar path
+  duplicando atenuação (volume do sink × RX Digital Volume × alguma
+  softvol interna do PipeWire) em vez de mapear 1:1 pro hardware.
+- Vale comparar o `RX Digital Volume` real needed pra bater volume
+  perceptual igual, e decidir se o volume "canônico" do sink PipeWire
+  deve ficar fixo em 100% (deixando o ganho todo pro `RX Digital
+  Volume`/hardware) ou se faz mais sentido controlar só pelo softvol do
+  PipeWire com o RX sempre no máximo.
+
+## 7. Pendências se isso virar o caminho padrão
+
+**Decisão do usuário (2026-09-03): SIM, tornar PipeWire+WirePlumber
+padrão na imagem.** Trabalho de implementação para a próxima sessão:
 
 1. Adicionar `wireplumber`, `pipewire-pulse`, `pipewire-alsa` ao
    `05-build-rootfs.sh` (hoje só `pipewire`/`libpipewire` estão na
