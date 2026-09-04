@@ -70,6 +70,39 @@ def find_event_nodes():
     return found
 
 
+def get_alsa_volume():
+    try:
+        out = subprocess.check_output(["amixer", "-c", "0", "cget", "name=RX3 Digital Volume"], text=True)
+        m = re.search(r": values=(\d+)", out)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+    return 75
+
+
+def set_alsa_volume(direction, step=4):
+    curr = get_alsa_volume()
+    if direction == "up":
+        new_val = min(124, curr + step)
+    else:
+        new_val = max(0, curr - step)
+    for ctl in ["RX1 Digital Volume", "RX2 Digital Volume", "RX3 Digital Volume"]:
+        try:
+            subprocess.run(["amixer", "-c", "0", "cset", f"name={ctl}", str(new_val)],
+                           check=False, capture_output=True)
+        except Exception:
+            pass
+    pct = int((new_val / 124.0) * 100)
+    print(f"[sanders-volume-keys] ALSA volume {direction}: {curr} -> {new_val} ({pct}%)", file=sys.stderr, flush=True)
+    try:
+        with open("/tmp/volume_feedback", "w") as f:
+            f.write(f"{pct}\n")
+    except Exception:
+        pass
+    return new_val
+
+
 def wpctl_volume(direction):
     sign = "+" if direction == "up" else "-"
     cmd = [
@@ -114,8 +147,10 @@ def main():
             if ev_type != EV_KEY or value != 1:
                 continue  # so reage ao press (value=1), ignora release/repeat
             if code == KEY_VOLUMEDOWN:
+                set_alsa_volume("down")
                 wpctl_volume("down")
             elif code == KEY_VOLUMEUP:
+                set_alsa_volume("up")
                 wpctl_volume("up")
 
 
