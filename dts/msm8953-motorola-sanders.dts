@@ -156,6 +156,12 @@
 
 
 
+&gpu_zap_shader {
+	/* Firmware fica em subdiretorio por-device (mesma convencao do
+	 * potter), nao no path "nu" default do dtsi upstream. */
+	firmware-name = "qcom/msm8953/motorola/sanders/a506_zap.mdt";
+};
+
 &hsusb_phy {
 	vdd-supply = <&pm8953_l3>;
 	vdda-pll-supply = <&pm8953_l7>;

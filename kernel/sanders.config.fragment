@@ -78,6 +78,11 @@ CONFIG_DRM_MSM=y
 CONFIG_DRM_MSM_MDP5=y
 CONFIG_DRM_MSM_DSI=y
 CONFIG_DRM_MSM_DSI_14NM_PHY=y
+# GPU Adreno 506 (freedreno) - msm-dpu + a5xx
+CONFIG_DRM_MSM_DPU=y
+CONFIG_DRM_MSM_HDMI=n
+# GPU zap shader (a506) - necessario pra GPU acelerada no msm8953
+CONFIG_QCOM_MDT_LOADER=y
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 CONFIG_BACKLIGHT_QCOM_WLED=y
 CONFIG_REGULATOR_QCOM_LABIBB=y
@@ -206,6 +211,12 @@ CONFIG_LTR501=y
 # Renomeado no kernel upstream (era CONFIG_WCN36XX_DEBUG); confirmado
 # 2026-09-03 que o nome antigo nao existe mais e era silenciosamente
 # ignorado pelo merge_config.
+
+# PMIC Power-On (PON) — controla power-key e resin (volume down) no
+# pm8953. Sem isso, o pon@800 (qcom,pm8916-pon) fica deferred e o
+# node resin (qcom,pm8941-resin) nunca e criado — volume down morto.
+CONFIG_POWER_RESET_QCOM_PON=y
+
 CONFIG_WCN36XX_DEBUGFS=y
 
 # LED de notificacao frontal (MPP2 do pmi8950 via leds-gpio). Habilita
@@ -306,6 +317,8 @@ CONFIG_WATCHDOG=y
 CONFIG_WATCHDOG_CORE=y
 CONFIG_WATCHDOG_SYSFS=y
 CONFIG_QCOM_WDT=y
+
+
 
 # Bateria e Carregador — a topologia real (charger+fuel-gauge
 # integrados no PMI8996) esta corretamente descrita em

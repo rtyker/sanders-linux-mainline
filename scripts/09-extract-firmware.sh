@@ -64,5 +64,13 @@ if [ ! -f "$FW_OUT/wlan/prima/WCNSS_qcom_wlan_nv.bin" ]; then
     warn "Boota o Linux mainline e copia via serial. Sem ele Wi-Fi nao sobe."
 fi
 
+# GPU zap shader firmware (a506_zap)
+msg "extraindo zap shader Adreno 506..."
+mkdir -p "$FW_OUT/qcom/msm8953/motorola/sanders"
+for f in a506_zap.b00 a506_zap.b01 a506_zap.b02 a506_zap.mdt a506_zap.elf; do
+    debugfs -R "dump image/$f $FW_OUT/qcom/msm8953/motorola/sanders/$f" "$TMP/NON-HLOS.raw" 2>/dev/null
+    [ -f "$FW_OUT/qcom/msm8953/motorola/sanders/$f" ] && [ -s "$FW_OUT/qcom/msm8953/motorola/sanders/$f" ] || warn "falhou: $f"
+done
+
 msg "OK. firmware em $FW_OUT/"
 ls -la "$FW_OUT/"

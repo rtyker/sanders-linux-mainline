@@ -63,6 +63,13 @@ if [ -d "$REPO/firmware" ] && ls "$REPO/firmware"/*.* >/dev/null 2>&1; then
     fi
 fi
 
+# GPU zap shader firmware (a506_zap) - necessario antes do switch_root
+if [ -d "$REPO/firmware/qcom/msm8953/motorola/sanders" ] && ls "$REPO/firmware/qcom/msm8953/motorola/sanders"/*.* >/dev/null 2>&1; then
+    msg "incorporando firmware de GPU no initramfs..."
+    mkdir -p "$INITRAMFS_ROOT/lib/firmware/qcom/msm8953/motorola/sanders"
+    cp "$REPO/firmware/qcom/msm8953/motorola/sanders"/*.* "$INITRAMFS_ROOT/lib/firmware/qcom/msm8953/motorola/sanders/" 2>/dev/null || true
+fi
+
 msg "compactando em $OUT/initramfs.cpio.gz..."
 # cpio -o imprime a linha "N blocks" informativa no stderr — nao suprime
 # tudo (2>/dev/null escondia isso E erros reais tipo disco cheio ou
