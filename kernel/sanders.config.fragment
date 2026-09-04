@@ -202,6 +202,7 @@ CONFIG_BT_HIDP=y
 CONFIG_BT_RFCOMM=y
 CONFIG_BT_BNEP=y
 
+
 # Sensor de proximidade + luz ambiente LiteON LTR559 (i2c_7 @ 0x23).
 # Driver mainline ltr501 cobre 501/559/301. Expoe via IIO. Builtin pq
 # initramfs nao tem modprobe (e o Phosh consome via iio-sensor-proxy).

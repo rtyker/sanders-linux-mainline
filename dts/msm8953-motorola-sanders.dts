@@ -156,6 +156,26 @@
 
 
 
+&gpu {
+	/* Upstream atual traz o no GPU com status="disabled" por padrao
+	 * (sem isso o kernel loga "no GPU device was found"). */
+	status = "okay";
+};
+
+&zap_shader_region {
+	/* O endereco default do dtsi upstream (0x81800000) cai DENTRO do
+	 * segmento de codigo do kernel nesta build (confirmado ao vivo via
+	 * /proc/iomem: "80000000-8270ffff : Kernel code" cobre
+	 * 0x81800000). Isso faz a reserva de memoria falhar silenciosamente
+	 * ("OF: reserved mem: failed to reserve...") e o zap shader falhar
+	 * com ENOMEM em tempo de boot (adreno_zap_shader_load -> gpu hw
+	 * init failed: -12). Realocado pra dentro do trecho livre confirmado
+	 * "92100000-aefd1fff : System RAM" (alinhado em 1MiB, bem longe do
+	 * kernel e de qualquer outra regiao reservada conhecida).
+	 */
+	reg = <0x0 0x92100000 0x0 0x2000>;
+};
+
 &gpu_zap_shader {
 	/* Firmware fica em subdiretorio por-device (mesma convencao do
 	 * potter), nao no path "nu" default do dtsi upstream. */
@@ -476,6 +496,13 @@
 		function = "cdc_pdm0";
 		drive-strength = <2>;
 		bias-disable;
+	};
+
+	gpio_key_default: gpio-key-default-state {
+		pins = "gpio85";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
 	};
 };
 

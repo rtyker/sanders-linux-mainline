@@ -61,6 +61,16 @@ if [ -d "$REPO/firmware" ] && ls "$REPO/firmware"/*.* >/dev/null 2>&1; then
         cp "$REPO/firmware"/adsp.* "$INITRAMFS_ROOT/lib/firmware/qcom/msm8953/"
         cp "$REPO/firmware"/adsp.* "$INITRAMFS_ROOT/lib/firmware/"
     fi
+    # Microcode PM4/PFP do Adreno a5xx (generico, compartilhado entre
+    # a505/a506/a508/a530 — nome de arquivo herdado do a530, ver
+    # a5xx_catalog.c). Nao vem do stock zip do sanders; copiado do
+    # potter-linux-mainline/firmware/ (mesmo upstream postmarketos,
+    # scarface-one/firmware-motorola-potter). O driver msm builtin
+    # pede "a530_pm4.fw"/"a530_pfp.fw" na raiz do initramfs antes do
+    # switch_root, senao GPU fica sem microcode (nao roda nada).
+    if ls "$REPO/firmware"/a530_p*.fw >/dev/null 2>&1; then
+        cp "$REPO/firmware"/a530_p*.fw "$INITRAMFS_ROOT/lib/firmware/"
+    fi
 fi
 
 # GPU zap shader firmware (a506_zap) - necessario antes do switch_root
