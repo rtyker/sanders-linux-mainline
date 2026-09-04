@@ -73,6 +73,18 @@ for f in adsp.mdt adsp.b00 adsp.b01 adsp.b02 adsp.b03 adsp.b04 adsp.b05 adsp.b06
     [ -f "$FW_OUT/$f" ] && [ -s "$FW_OUT/$f" ] || warn "falhou: $f"
 done
 
+# Microcode PM4/PFP do Adreno a5xx (generico, compartilhado entre
+# a505/a506/a508/a530 — nome de arquivo herdado do a530, ver
+# a5xx_catalog.c). Nao vem do stock zip do sanders; este script
+# copiara do modo donwload automático se disponível.
+msg "extraindo microcode Adreno 5xx (a530_pm4.fw / a530_pfp.fw)..."
+mkdir -p "$FW_OUT/a530"
+for f in a530_pm4.fw a530_pfp.fw; do
+    debugfs -R "dump image/$f $FW_OUT/a530/$f" "$TMP/NON-HLOS.raw" 2>/dev/null || true
+done
+[ -s "$FW_OUT/a530/a530_pm4.fw" ] || warn "a530_pm4.fw nao encontrado na imagem"
+[ -s "$FW_OUT/a530/a530_pfp.fw" ] || warn "a530_pfp.fw nao encontrado na imagem"
+
 # GPU zap shader firmware (a506_zap)
 msg "extraindo zap shader Adreno 506..."
 mkdir -p "$FW_OUT/qcom/msm8953/motorola/sanders"

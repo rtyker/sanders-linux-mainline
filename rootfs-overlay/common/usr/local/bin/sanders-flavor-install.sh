@@ -211,7 +211,8 @@ flavor_xfce_install() {
         xorg-server xorg-xinit xorg-xrandr \
         xf86-input-libinput \
         xfce4 xfce4-terminal \
-        ttf-dejavu noto-fonts
+        ttf-dejavu noto-fonts \
+        gst-plugins-base gst-plugins-good gst-plugins-ugly evtest
 
     echo "[flavor:xfce] Escrevendo xinitrc..."
     # dbus-run-session (nao "exec startxfce4" puro, nem "dbus-launch"):
@@ -370,7 +371,7 @@ flavor_westonmin_install() {
     # /usr/bin/Xwayland (lazy, so no primeiro cliente X) e morre com
     # "Couldn't launch client" -> "xserver crashing too fast, not
     # restarting" — confirmado ao vivo 2026-09-04.
-    pacman_install weston neatvnc seatd xorg-xwayland
+    pacman_install weston neatvnc seatd xorg-xwayland gst-plugins-base gst-plugins-good gst-plugins-ugly evtest
 
     echo "[flavor:weston-minimal] Habilitando seatd..."
     systemctl enable --now seatd.service

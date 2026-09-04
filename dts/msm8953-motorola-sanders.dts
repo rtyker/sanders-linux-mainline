@@ -199,26 +199,54 @@
 	/delete-property/ dmas;
 	/delete-property/ dma-names;
 
-	/* Moto G5s Plus stock Android usa Focaltech FT5436 @ 0x38 com
-	 * VDD em pm8953_l10 (2.85V, always-on) e VCC_I2C em pm8953_l5
-	 * (1.8V). Reset GPIO 64, IRQ GPIO 65. (Nao Synaptics RMI4 como
-	 * o irmao potter.) */
+	/* Moto G5s Plus (sanders) usa Focaltech FT5436 @ 0x38.
+	 * Desabilitado no potter para evitar conflito de barramento e erros de I2C (-6). */
 	touchscreen@38 {
 		reg = <0x38>;
 		compatible = "focaltech,ft5426";
+		status = "disabled";
 
 		interrupt-parent = <&tlmm>;
 		interrupts = <65 IRQ_TYPE_EDGE_FALLING>;
-
-		/* Reset GPIO controlado via gpio-hog (sempre HIGH) — o pulse
-		 * curto do driver (~5ms) estava deixando o chip num estado
-		 * de boot e o regmap_bulk_read dava -ETIMEDOUT. */
 
 		vcc-supply = <&pm8953_l10>;
 		iovcc-supply = <&pm8953_l5>;
 
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <1920>;
+	};
+
+	/* Moto G5 Plus (potter / XT1683) usa Synaptics RMI4 @ 0x20 com
+	 * VDD em pm8953_l10 (2.85V, always-on) e VCC_I2C em pm8953_l5 (1.8V).
+	 * Reset GPIO 64 (gpio-hog HIGH), IRQ GPIO 65. */
+	touchscreen@20 {
+		compatible = "syna,rmi4-i2c";
+		reg = <0x20>;
+		status = "okay";
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <65 IRQ_TYPE_EDGE_FALLING>;
+
+		syna,startup-delay-ms = <100>;
+		vdd-supply = <&pm8953_l10>;
+		vio-supply = <&pm8953_l5>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rmi4-f01@1 {
+			reg = <0x1>;
+			syna,nosleep-mode = <1>;
+		};
+
+		rmi4-f12@12 {
+			reg = <0x12>;
+			syna,sensor-type = <1>;
+			syna,clip-x-high = <1080>;
+			syna,clip-y-high = <1920>;
+			touchscreen-size-x = <1080>;
+			touchscreen-size-y = <1920>;
+		};
 	};
 };
 
@@ -645,8 +673,8 @@
 
 /*
  * Subsistema Hexagon ADSP (Audio QDSP6 + FastRPC / Sensores DSPS)
- * NOTA: O nó FastRPC experimental foi mapeado mas requer ajuste de contexto SMMU/IOMMU
- * (sem memory-region ou smmu mapeado, trava no early boot). Mantido documentado.
+ * NOTA: O nó FastRPC experimental requer ajuste de contexto SMMU/IOMMU.
+ * Mantido documentado.
  */
 &lpass {
 	status = "okay";

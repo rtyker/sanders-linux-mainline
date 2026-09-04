@@ -124,6 +124,7 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
             seatd libdisplay-info \
             xorg-xwayland mesa mesa-utils mesa-demos \
             ttf-dejavu noto-fonts \
+            gst-plugins-base gst-plugins-good gst-plugins-ugly evtest \
             || die "pacman -S do stack desktop falhou"
         arch-chroot "$MNT" systemctl enable seatd.service >/dev/null
     fi
