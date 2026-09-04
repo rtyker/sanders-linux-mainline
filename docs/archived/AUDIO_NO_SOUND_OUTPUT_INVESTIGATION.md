@@ -1,7 +1,7 @@
 # 🔊 Investigação: PCM Funciona mas Sem Áudio Audível
 
 > **Data:** 2026-09-03
-> **Status:** Investigação ativa — PCM abre e toca, mas nenhum som sai
+> **Status:** RESOLVIDO por outro agente — ver `AUDIO_RESOLVIDO_SOM_AUDIVEL.md`
 > **Pré-requisito:** SPMI USID 1 corrigido, PCM open EINVAL corrigido (kernel #41)
 
 ---

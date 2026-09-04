@@ -22,7 +22,8 @@ STOCK_ZIP="${STOCK_ZIP:-}"
 # do projeto que mantenha essa mesma estrutura de diretorios pai/submodulo.
 STOCK_DIR_DEFAULT="$REPO/../stock"
 if [ -z "$STOCK_ZIP" ]; then
-    STOCK_ZIP=$(ls "$STOCK_DIR_DEFAULT"/SANDERS_RETAIL_*.zip 2>/dev/null | head -1 || true)
+    # Prioriza o stock do device de bancada (potter) se presente, ou fallback sanders
+    STOCK_ZIP=$(ls "$STOCK_DIR_DEFAULT"/*POTTER_*.zip "$STOCK_DIR_DEFAULT"/SANDERS_RETAIL_*.zip 2>/dev/null | head -1 || true)
 fi
 [ -f "$STOCK_ZIP" ] || die "stock zip nao encontrado. Defina STOCK_ZIP=... ou ponha em $STOCK_DIR_DEFAULT/"
 
@@ -63,6 +64,14 @@ if [ ! -f "$FW_OUT/wlan/prima/WCNSS_qcom_wlan_nv.bin" ]; then
     warn "Esse arquivo vive em /vendor (mmcblk0p51) como WCNSS_cfg.dat."
     warn "Boota o Linux mainline e copia via serial. Sem ele Wi-Fi nao sobe."
 fi
+
+# ADSP firmware (adsp.mdt e adsp.bXX - Audio & Sensores Hexagon DSPS)
+msg "extraindo firmware ADSP (audio + sensores DSPS)..."
+for f in adsp.mdt adsp.b00 adsp.b01 adsp.b02 adsp.b03 adsp.b04 adsp.b05 adsp.b06 \
+         adsp.b07 adsp.b08 adsp.b09 adsp.b10 adsp.b11 adsp.b12 adsp.b13; do
+    debugfs -R "dump image/$f $FW_OUT/$f" "$TMP/NON-HLOS.raw" 2>/dev/null
+    [ -f "$FW_OUT/$f" ] && [ -s "$FW_OUT/$f" ] || warn "falhou: $f"
+done
 
 # GPU zap shader firmware (a506_zap)
 msg "extraindo zap shader Adreno 506..."

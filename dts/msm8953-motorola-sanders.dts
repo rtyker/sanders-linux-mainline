@@ -644,10 +644,31 @@
 };
 
 /*
- * Subsistema de Audio Qualcomm (Hexagon ADSP PIL + QDSP6 + Codecs PM8953)
+ * Subsistema Hexagon ADSP (Audio QDSP6 + FastRPC / Sensores DSPS)
+ * NOTA: O nó FastRPC experimental foi mapeado mas requer ajuste de contexto SMMU/IOMMU
+ * (sem memory-region ou smmu mapeado, trava no early boot). Mantido documentado.
  */
 &lpass {
 	status = "okay";
+
+	/*
+	smd-edge {
+		fastrpc {
+			compatible = "qcom,fastrpc";
+			qcom,smd-channels = "fastrpcsmd-apps-dsp";
+			label = "adsp";
+			qcom,non-secure-domain;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			cb@1 {
+				compatible = "qcom,fastrpc-compute-cb";
+				reg = <1>;
+			};
+		};
+	};
+	*/
 };
 
 &spmi_bus {
