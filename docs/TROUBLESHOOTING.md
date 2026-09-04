@@ -308,10 +308,54 @@ sudo nmcli connection up sanders-ecm
 Com isso o NM aplica o IP automaticamente toda vez que a interface
 aparece, e o `08-host-net.sh` só precisa cuidar de NAT/forward.
 
-## 17. Aparelho trava na tela de aviso "unlocked bootloader" do ABOOT de fábrica (não chega nem no lk2nd) — NÃO RESOLVIDO
+## 17. Aparelho "trava" na tela de aviso "unlocked bootloader" do ABOOT — causa real era o HOST, não o aparelho
 
 **Data:** 2026-09-04
-**Status:** ⚠️ Aberto — usuário está resolvendo fisicamente, não retomar automação até ele confirmar que voltou.
+**Status:** ✅ Resolvido — causa raiz era ambiental (host), não o aparelho/lk2nd/kernel.
+
+**Causa raiz real:** uma VM do `virt-manager`/libvirt rodando no HOST de
+desenvolvimento estava configurada para **sequestrar automaticamente**
+o dispositivo USB do aparelho (regra de passthrough automático por
+idVendor/idProduct, comum em configs de VM Windows-pra-ADB/fastboot ou
+similar) toda vez que ele reenumerava. Isso fazia o Linux do host
+perder a interface bem no meio da sequência de boot, dando a falsa
+impressão de que o aparelho tinha travado na tela do ABOOT — na
+verdade o aparelho provavelmente seguia o boot normalmente, só que o
+host não conseguia mais falar com ele (nem serial, nem fastboot
+estável) porque a VM tinha acabado de puxar o dispositivo pra si.
+**Nenhuma das duas ações de recuperação abaixo (seção antiga) foi
+necessária** — o problema nunca esteve na `cache`, no `lk2nd`, nem no
+hardware do aparelho.
+
+**Fix:** desabilitar/desativar a regra de auto-attach de USB dessa VM
+no `virt-manager` (ou parar a VM) antes de trabalhar no aparelho.
+
+**Efeito colateral do diagnóstico incorreto:** durante a tentativa de
+recuperação, foi feito `fastboot flash cache build/out/boot-cache.img`
+usando o arquivo mais recente por data de modificação no host — mas
+esse arquivo tinha sido **sobrescrito por outra sessão de trabalho
+concorrente** (rodando `06-build-boot.sh` em paralelo, provavelmente
+a mesma frente de FastRPC/SLPI de sensores) com um kernel **antigo**
+(`7.1.0-rc4-...-dirty #33`, de 2026-09-03), não o kernel com GPU
+validado nesta sessão (`7.2.0-dirty #43`). Resultado: depois do
+aparelho voltar a bootar normalmente, a GPU regressiu
+(`no GPU device was found` de novo) porque o kernel errado ficou
+gravado na `cache`. **Lição:** não confiar no timestamp de
+`build/out/*.img` como proxy de "última build boa" quando há mais de
+uma sessão/agente rodando `02-build-kernel.sh`/`06-build-boot.sh` no
+mesmo `$BUILD` compartilhado — confirmar a versão do kernel
+(`uname -a`) e o conteúdo esperado (ex.: `grep CONFIG_DRM_MSM_DPU
+build/linux/.config`) antes de flashar em situação de recuperação.
+
+---
+
+### Histórico da investigação original (diagnóstico incorreto, mantido para contexto)
+
+O texto abaixo documenta o que foi tentado **antes** de descobrir a causa
+real acima — mantido porque as duas ações (reflash de `cache` e de
+`boot`/`recovery`) continuam válidas como recursos de recuperação
+genuínos para quando o problema for de verdade no aparelho, só não
+foram a causa nem a solução desta vez.
 
 **Sintoma:** boot normal (power-on ou `fastboot reboot`) mostra a tela
 padrão do ABOOT desbloqueado ("Your device has been unlocked and can't
@@ -362,10 +406,10 @@ usuário antes de tentar):
   rodado como processo em foreground via SSH, nada que toque bootloader
   ou partições).
 
-**Para o próximo agente/sessão:** não repetir os dois reflashes acima
-sem motivo novo — já foram tentados e não fazem diferença. Se o usuário
-confirmar que voltou a bootar normalmente após intervenção física,
-perguntar como resolveu antes de continuar qualquer trabalho, e
-considerar se algo na sequência de testes de botões (poweroff real via
-tecla Power, ciclos rápidos de liga/desliga) tem relação causal real ou
-foi coincidência.
+**Para o próximo agente/sessão:** se o aparelho parecer travar no ABOOT
+de novo, **verifique primeiro se alguma VM local (virt-manager/libvirt,
+VirtualBox, etc.) está com auto-attach de USB configurado** antes de
+sair reflashando partições — foi essa a causa real desta vez, não o
+aparelho. Os testes de botões físicos (poweroff real via tecla Power,
+ciclos de liga/desliga) não tiveram relação causal — foi coincidência
+de timing com a VM.
