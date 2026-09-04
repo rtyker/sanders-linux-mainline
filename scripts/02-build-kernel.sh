@@ -44,10 +44,20 @@ for p in "$REPO"/kernel/*.patch; do
     fi
 done
 
-if [ ! -f .config ]; then
-    msg "make defconfig (arm64)..."
-    make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" defconfig
-fi
+# Sempre gera um .config novo a partir do defconfig, mesmo se ja existir
+# um de uma build anterior. $LINUX_SRC (dentro de $BUILD) e compartilhado
+# entre sessoes/agentes rodando em paralelo no mesmo host — um .config
+# deixado por outra sessao pode ter symbols de experimentos que ja foram
+# removidos/comentados no fragment atual, e o merge_config.sh -m abaixo
+# so SOBRESCREVE o que esta explicito no fragment, nunca reseta o que
+# nao esta mais la. Isso ja causou um travamento real de boot (kernel
+# saiu com metade do tamanho esperado, CONFIG_QCOM_FASTRPC=y preso de
+# uma build de outra sessao que ja tinha comentado esse symbol no
+# fragment ha muito tempo) — ver docs/TROUBLESHOOTING.md item 18.
+# Custo extra e so os passos de config (segundos); o ccache continua
+# cobrindo a recompilacao de verdade normalmente.
+msg "make defconfig (arm64)..."
+make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" defconfig
 
 msg "aplicando config fragment do sanders..."
 ./scripts/kconfig/merge_config.sh -m .config "$REPO/kernel/sanders.config.fragment"
