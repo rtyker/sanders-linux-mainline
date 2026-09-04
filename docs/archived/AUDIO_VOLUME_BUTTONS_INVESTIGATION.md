@@ -188,3 +188,32 @@ timeout 10 cat /dev/input/event3 | od -A d -t x1
 - O deploy usa `10-deploy-boot.sh --reboot` que sobrescreve o cache partition
 - Após deploy, testar AMBOS os botões — pode ser que um funcione e o outro não ainda
 - Se o botão de volume UP funcionar mas não controlar volume do ALSA, verificar se o userspace (aplay/amixer) precisa de um daemon para reagir a KEY_VOLUMEUP/KEY_VOLUMEDOWN
+
+## 7. Associação com PipeWire (2026-09-04) — implementado, teste end-to-end INTERROMPIDO
+
+Depois da confirmação ao vivo da seção 0, implementado um daemon simples
+(`rootfs-overlay/common/usr/local/bin/sanders-volume-keys.py`, instalado/
+habilitado via `setup_volume_keys_service()` em `sanders-flavor-install.sh`
+— só nos flavors gráficos `xfce`/`xorg-minimal`/`wayland-minimal`, nunca em
+headless/server) que le `/dev/input/eventN` direto (resolve os devices pelo
+nome, nao por numero fixo) e chama `wpctl set-volume @DEFAULT_AUDIO_SINK@
+5%+`/`5%-` via `runuser -u alarm` a cada KEY_VOLUMEUP/DOWN.
+
+**Testado e confirmado:** o script detecta os devices corretos
+(`pm8941_resin` -> code 114, `gpio-keys` -> code 115) e roda sem erro.
+
+**NÃO testado ainda:** se o `wpctl` de fato muda o volume — porque o
+PipeWire não estava rodando no device no momento do teste (trabalho de
+tornar PipeWire+WirePlumber o padrão ainda está pendente, ver
+`docs/ROADMAP_AND_TODOS.md` / `AUDIO_PIPEWIRE_TESTE.md`), e o teste ao
+vivo foi interrompido por um incidente não relacionado (aparelho travou
+no boot — ver `sanders-linux-mainline/docs/TROUBLESHOOTING.md` item 17)
+antes de conseguir subir uma sessão PipeWire pro usuário "alarm" e testar
+o fluxo completo com áudio tocando.
+
+**Para o próximo agente:** depois que o PipeWire estiver rodando como
+sessão padrão do usuário "alarm", testar apertando Volume Up/Down com
+áudio tocando e confirmar que o volume muda de verdade (`wpctl get-volume
+@DEFAULT_AUDIO_SINK@` antes/depois). Se o usuário de sessão do PipeWire
+mudar de "alarm" pra outro, ajustar `SANDERS_PIPEWIRE_USER=` na unit
+`sanders-volume-keys.service` (ou a env var default no próprio script).

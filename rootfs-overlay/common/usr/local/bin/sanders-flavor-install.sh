@@ -23,10 +23,10 @@ ACTION="${2:---install}"
 DSI_CONNECTOR="DSI-1"
 
 list_flavors() {
-    echo "Flavors disponiveis:"
+    echo "Flavors disponiveis (todos com teclas de Volume Up/Down -> PipeWire habilitadas):"
     echo "  xfce             — Xorg + XFCE4 (desktop leve via X11, tty1) + x11vnc (:5900)"
-    echo "  xorg-minimal     — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900)"
-    echo "  wayland-minimal  — Weston (compositor Wayland minimo, sem shell/painel extra), backend VNC nativo (:5900)"
+    echo "  xorg-minimal     — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900) [FALLBACK — Xorg trava o painel DSI em alguns casos, prefira wayland-minimal]"
+    echo "  wayland-minimal  — Weston (compositor Wayland minimo, sem shell/painel extra) com GPU real (freedreno), backend VNC nativo (:5900) [PREFERENCIAL]"
 }
 
 pacman_install() {
@@ -87,6 +87,42 @@ EOF
     systemctl daemon-reload
 }
 
+# --- Helper compartilhado: teclas de Volume Up/Down -> PipeWire ------------
+#
+# Generico de proposito, igual ao x11vnc acima — nao depende de X11 nem
+# Wayland (le os eventos direto de /dev/input/eventN via evdev), entao
+# funciona igual nos tres flavors graficos. So faz sentido nesses
+# flavors: em headless/server nao ha PipeWire rodando (nem sentido em
+# volume de saida de audio sem sessao grafica nenhuma), por isso este
+# helper so e chamado pelos instaladores de flavor abaixo, nunca no
+# build base (05-build-rootfs.sh).
+setup_volume_keys_service() {
+    local tag="$1"
+
+    echo "[$tag] Instalando unit systemd das teclas de Volume Up/Down -> PipeWire..."
+    cat > /etc/systemd/system/sanders-volume-keys.service <<'EOF'
+[Unit]
+Description=Volume Up/Down (evdev) -> PipeWire via wpctl (sanders)
+After=multi-user.target
+
+[Service]
+Type=simple
+# PIPEWIRE_USER: usuario dono da sessao PipeWire (--user) que o wpctl
+# do script vai controlar via runuser. Ver docs/ROADMAP_AND_TODOS.md
+# (secao PipeWire) pra qual usuario efetivamente roda a sessao de audio
+# neste sistema — hoje "alarm". Ajuste aqui se isso mudar.
+Environment=SANDERS_PIPEWIRE_USER=alarm
+ExecStart=/usr/bin/python3 /usr/local/bin/sanders-volume-keys.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now sanders-volume-keys.service
+}
+
 # --- Flavor: xfce -----------------------------------------------------------
 
 flavor_xfce_install() {
@@ -122,6 +158,7 @@ EOF
     chmod +x /usr/local/bin/sanders-xfce-xinitrc
 
     setup_x11vnc_service "flavor:xfce"
+    setup_volume_keys_service "flavor:xfce"
 
     echo "[flavor:xfce] Instalando unit systemd (tty1, mesmo padrao do weston/phosh)..."
     cat > /etc/systemd/system/sanders-xfce.service <<'EOF'
@@ -165,6 +202,7 @@ flavor_xfce_remove() {
     echo "[flavor:xfce] Desabilitando (pacotes permanecem instalados — remova via pacman -R se quiser)..."
     systemctl disable --now sanders-xfce.service 2>/dev/null || true
     systemctl disable --now sanders-x11vnc.service 2>/dev/null || true
+    systemctl disable --now sanders-volume-keys.service 2>/dev/null || true
     systemctl enable --now getty@tty1.service 2>/dev/null || true
 }
 
@@ -194,6 +232,7 @@ EOF
     chmod +x /usr/local/bin/sanders-xorgmin-xinitrc
 
     setup_x11vnc_service "flavor:xorg-minimal"
+    setup_volume_keys_service "flavor:xorg-minimal"
 
     echo "[flavor:xorg-minimal] Instalando unit systemd (tty1)..."
     cat > /etc/systemd/system/sanders-xorg-minimal.service <<'EOF'
@@ -228,6 +267,7 @@ flavor_xorgmin_remove() {
     echo "[flavor:xorg-minimal] Desabilitando..."
     systemctl disable --now sanders-xorg-minimal.service 2>/dev/null || true
     systemctl disable --now sanders-x11vnc.service 2>/dev/null || true
+    systemctl disable --now sanders-volume-keys.service 2>/dev/null || true
     systemctl enable --now getty@tty1.service 2>/dev/null || true
 }
 
@@ -260,6 +300,8 @@ flavor_westonmin_install() {
 
     echo "[flavor:wayland-minimal] Habilitando seatd..."
     systemctl enable --now seatd.service
+
+    setup_volume_keys_service "flavor:wayland-minimal"
 
     echo "[flavor:wayland-minimal] Escrevendo weston.ini..."
     mkdir -p /root/.config
@@ -334,6 +376,7 @@ EOF
 flavor_westonmin_remove() {
     echo "[flavor:wayland-minimal] Desabilitando..."
     systemctl disable --now sanders-weston-minimal.service 2>/dev/null || true
+    systemctl disable --now sanders-volume-keys.service 2>/dev/null || true
     systemctl enable --now getty@tty1.service 2>/dev/null || true
 }
 

@@ -307,3 +307,65 @@ sudo nmcli connection up sanders-ecm
 
 Com isso o NM aplica o IP automaticamente toda vez que a interface
 aparece, e o `08-host-net.sh` só precisa cuidar de NAT/forward.
+
+## 17. Aparelho trava na tela de aviso "unlocked bootloader" do ABOOT de fábrica (não chega nem no lk2nd) — NÃO RESOLVIDO
+
+**Data:** 2026-09-04
+**Status:** ⚠️ Aberto — usuário está resolvendo fisicamente, não retomar automação até ele confirmar que voltou.
+
+**Sintoma:** boot normal (power-on ou `fastboot reboot`) mostra a tela
+padrão do ABOOT desbloqueado ("Your device has been unlocked and can't
+be trusted... your device will boot in 5 seconds"), vibra uma vez, mas
+**nunca sai dela** — nem chega a mostrar a tela do `lk2nd` (apelido
+interno: "lk"), muito menos o Linux. Rodapé da tela mostra a versão do
+ABOOT ("19.0"). `fastboot devices` continua enxergando o aparelho
+normalmente o tempo todo (forçando o modo manualmente via botão) —
+**o bootloader ABOOT em si responde**, só a sequência de boot normal
+(ABOOT → aviso → chainload pro `lk2nd`) é que não progride.
+
+**Contexto de quando apareceu:** durante uma sessão de trabalho em outra
+frente (botões de volume associados ao PipeWire, ver
+`docs/archived/AUDIO_VOLUME_BUTTONS_INVESTIGATION.md`) que envolveu
+vários testes de apertar Volume Up/Down/Power fisicamente repetidas
+vezes, incluindo um teste que confirmou o botão Power disparando um
+`poweroff` real via systemd-logind. Depois de um desses ciclos de
+liga/desliga físicos, o aparelho passou a travar nessa tela.
+
+**O que foi tentado e NÃO resolveu** (cada um confirmado com reboot
+completo depois, mesmo resultado):
+
+1. `fastboot flash cache build/out/boot-cache.img` (última imagem
+   conhecida-boa, com kernel+DTB+initramfs do trabalho de GPU já
+   validado ao vivo horas antes) — sem efeito. Isso descarta corrupção
+   do kernel/DTB/initramfs/`extlinux.conf` como causa, já que nem chega
+   a esse estágio.
+2. `fastboot flash boot build/out/lk2nd.img` + `fastboot flash recovery
+   build/out/lk2nd.img` (mesmo binário do lk2nd que já devia estar
+   gravado ali permanentemente, ver seção "Boot Architecture" do
+   `AGENTS.md`) — sem efeito. Ambos os flashes reportaram `OKAY` (o
+   aviso `Image not signed or corrupt` é esperado/normal em bootloader
+   desbloqueado, não é erro). Isso descarta corrupção das partições
+   `boot`/`recovery` como causa — o problema é anterior a isso, na
+   própria lógica de boot do ABOOT de fábrica.
+
+**Hipóteses não testadas** (o processo foi interrompido a pedido do
+usuário antes de tentar):
+- Corte de energia forçado (segurar Power ~10-15s até vibrar/desligar
+  de vez) seguido de power-on normal — não testado, foi o próximo passo
+  sugerido quando a sessão parou.
+- Problema de hardware genuíno (eMMC, conector, bateria/energia,
+  térmico) não relacionado a nenhuma escrita de partição feita nesta
+  sessão.
+- Nenhuma mudança feita nesta sessão tocou em `boot`/`recovery`/`cache`
+  antes do travamento começar — os únicos arquivos alterados no device
+  rodando antes disso foram userspace puro (`/usr/local/bin/sanders-volume-keys.py`,
+  rodado como processo em foreground via SSH, nada que toque bootloader
+  ou partições).
+
+**Para o próximo agente/sessão:** não repetir os dois reflashes acima
+sem motivo novo — já foram tentados e não fazem diferença. Se o usuário
+confirmar que voltou a bootar normalmente após intervenção física,
+perguntar como resolveu antes de continuar qualquer trabalho, e
+considerar se algo na sequência de testes de botões (poweroff real via
+tecla Power, ciclos rápidos de liga/desliga) tem relação causal real ou
+foi coincidência.
