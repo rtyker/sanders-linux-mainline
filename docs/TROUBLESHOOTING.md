@@ -455,19 +455,17 @@ funcionavam), e o deploy bootou normalmente — GPU incluída, zero erros
 no dmesg, confirmado via SSH (`uname -a` → kernel novo, `/dev/dri/card1`
 presente).
 
-**Pendência real:** o bug de idempotência do `02-build-kernel.sh` em si
-**não foi corrigido no script** — só foi contornado manualmente
-(`rm -f .config` antes de rodar). Isso pode voltar a acontecer pra
-qualquer sessão que reaproveite esse mesmo `$BUILD/linux` depois de
-outra sessão ter setado/removido algum `CONFIG_*` do fragment. Considerar
-uma correção permanente (ex.: sempre `defconfig` do zero, ignorando o
-`.config` existente) da próxima vez que alguém mexer nesse script — o
-custo é só refazer os passos de config (segundos), o ccache continua
-cobrindo a recompilação de verdade.
+**Correção permanente aplicada (2026-09-04, commit `ef18b23`):**
+`02-build-kernel.sh` agora sempre roda `defconfig` do zero antes de
+aplicar o fragment, em vez de só quando `.config` não existe — elimina
+o drift de vez, não é mais preciso lembrar de `rm -f .config`
+manualmente. Testado: build reproduziu o `.config` correto (`Image.gz`
+17MB, mesmo tamanho dos builds que funcionam) sem recompilar o que já
+estava certo (ccache seguiu cobrindo normalmente).
 
-**Para o próximo agente/sessão:** se um deploy novo travar o boot de
-forma misteriosa (principalmente depois de outra sessão ter mexido no
-`sanders.config.fragment` recentemente), suspeitar primeiro de drift no
-`.config` compartilhado — comparar o tamanho do `Image.gz` contra o
-último build que funcionou é um sinal rápido (diferença de vários MB é
-suspeita), e `rm -f build/linux/.config` antes do rebuild é o fix.
+**Para o próximo agente/sessão:** o fix já está no script — não precisa
+mais fazer `rm -f build/linux/.config` manualmente antes de builds de
+recuperação. Se um deploy travar o boot de forma misteriosa mesmo assim,
+comparar o tamanho do `Image.gz` contra o último build que funcionou
+continua sendo um sinal rápido de diagnóstico (diferença de vários MB é
+suspeita).
