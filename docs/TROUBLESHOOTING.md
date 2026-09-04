@@ -413,3 +413,61 @@ sair reflashando partições — foi essa a causa real desta vez, não o
 aparelho. Os testes de botões físicos (poweroff real via tecla Power,
 ciclos de liga/desliga) não tiveram relação causal — foi coincidência
 de timing com a VM.
+
+## 18. Boot trava depois do `lk`, sem chegar no Linux — `.config` do kernel com drift de sessões concorrentes
+
+**Data:** 2026-09-04
+**Status:** ✅ Resolvido — causa confirmada por reprodução e correção (não só teoria).
+
+**Sintoma:** depois de resolver o incidente #17 (VM roubando USB), o
+recovery reflashou por engano um `build/out/boot-cache.img` desatualizado
+(kernel `7.1.0-rc4 #33`, sem GPU). Um rebuild "de recuperação" rodado em
+seguida (sem apagar `build/linux/.config`) gerou um `Image.gz` visivelmente
+menor (13MB, contra ~17-18MB dos builds que funcionavam) e, ao ser
+deployado, travava o boot **depois** da tela do `lk` (mais adiante que o
+incidente #17 — não chegava a mostrar nada no Linux, nem log de kernel
+nenhum no serial).
+
+**Causa raiz confirmada:** `scripts/02-build-kernel.sh` só roda `make
+defconfig` se `.config` **não existir**:
+```bash
+if [ ! -f .config ]; then
+    make ARCH=arm64 CROSS_COMPILE="$ARM64_CC" defconfig
+fi
+```
+Como `$BUILD/linux` é uma árvore **compartilhada** entre sessões/agentes
+trabalhando em paralelo no mesmo host, um `.config` deixado por uma
+build anterior (nesse caso, de quando outra sessão testava
+`CONFIG_QCOM_FASTRPC=y` antes de decidir desativá-lo e comentar no
+fragment) continua servindo de base pra sempre. `merge_config.sh -m
+.config fragment` só sobrescreve os símbolos **explícitos no fragment
+atual** — um símbolo que uma versão antiga do fragment forçava e a
+versão nova removeu/comentou fica preso com o valor velho
+silenciosamente, sem warning nenhum. Diferente das patches de kernel
+(que são idempotentes por design, ver `AGENTS.md`), esse merge de
+`.config` **não é idempotente entre versões diferentes do fragment**.
+
+**Fix aplicado:** apagar `build/linux/.config` e rodar
+`02-build-kernel.sh` do zero (força `defconfig` limpo + merge do
+fragment atual, sem nenhum resíduo). Resultado: `Image.gz` voltou a
+~17MB, `boot-cache.img` voltou a ~30MB (batendo com os builds que
+funcionavam), e o deploy bootou normalmente — GPU incluída, zero erros
+no dmesg, confirmado via SSH (`uname -a` → kernel novo, `/dev/dri/card1`
+presente).
+
+**Pendência real:** o bug de idempotência do `02-build-kernel.sh` em si
+**não foi corrigido no script** — só foi contornado manualmente
+(`rm -f .config` antes de rodar). Isso pode voltar a acontecer pra
+qualquer sessão que reaproveite esse mesmo `$BUILD/linux` depois de
+outra sessão ter setado/removido algum `CONFIG_*` do fragment. Considerar
+uma correção permanente (ex.: sempre `defconfig` do zero, ignorando o
+`.config` existente) da próxima vez que alguém mexer nesse script — o
+custo é só refazer os passos de config (segundos), o ccache continua
+cobrindo a recompilação de verdade.
+
+**Para o próximo agente/sessão:** se um deploy novo travar o boot de
+forma misteriosa (principalmente depois de outra sessão ter mexido no
+`sanders.config.fragment` recentemente), suspeitar primeiro de drift no
+`.config` compartilhado — comparar o tamanho do `Image.gz` contra o
+último build que funcionou é um sinal rápido (diferença de vários MB é
+suspeita), e `rm -f build/linux/.config` antes do rebuild é o fix.
