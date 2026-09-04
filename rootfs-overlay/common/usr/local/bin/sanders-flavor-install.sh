@@ -252,8 +252,11 @@ flavor_westonmin_install() {
     # should either provide the logind D-Bus API, or use seatd."
     # Confirmado ao vivo 2026-09-03 (mesma dependencia que ja existia
     # pro weston.service do flavor "desktop" antigo, so nao tinha sido
-    # replicada aqui).
-    pacman_install weston neatvnc seatd
+    # replicada aqui). xorg-xwayland: sem ele o weston tenta lancar
+    # /usr/bin/Xwayland (lazy, so no primeiro cliente X) e morre com
+    # "Couldn't launch client" -> "xserver crashing too fast, not
+    # restarting" — confirmado ao vivo 2026-09-04.
+    pacman_install weston neatvnc seatd xorg-xwayland
 
     echo "[flavor:wayland-minimal] Habilitando seatd..."
     systemctl enable --now seatd.service
@@ -262,7 +265,7 @@ flavor_westonmin_install() {
     mkdir -p /root/.config
     cat > /root/.config/weston.ini <<EOF
 [core]
-xwayland=false
+xwayland=true
 idle-time=0
 require-input=false
 
@@ -295,15 +298,19 @@ User=root
 Environment=XDG_RUNTIME_DIR=/run/user/0
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/chmod 700 /run/user/0
-# --renderer=pixman: este kernel nao expoe GPU (Adreno) nenhuma — dmesg
-# mostra "msm_mdp: no GPU device was found", so o display-controller
-# MDP5/DSI existe. O renderer GL/EGL padrao do weston tenta abrir um
-# device de GPU (freedreno) que nao existe, causa "fd_pipe_new2:
-# allocation failed" e crash com core-dump, tela fica preta. Confirmado
-# ao vivo 2026-09-03. Pixman (software) nao depende de GPU nenhuma —
-# mesma razao pela qual o Xorg com "modesetting" (flavors xfce e
-# xorg-minimal) ja funciona sem GL.
-ExecStart=/usr/bin/weston --backends=drm-backend.so,vnc-backend.so --renderer=pixman --disable-transport-layer-security
+# /tmp/.X11-unix pode nao existir ainda neste rootfs minimal (sem
+# systemd-tmpfiles-setup rodando as regras do xorg-server a tempo) —
+# sem ele o Xwayland falha "failed to bind to /tmp/.X11-unix/X0: No
+# such file or directory" e o weston mata o processo. Confirmado ao
+# vivo 2026-09-04.
+ExecStartPre=/bin/mkdir -p /tmp/.X11-unix
+ExecStartPre=/bin/chmod 1777 /tmp/.X11-unix
+# --renderer=gl: GPU Adreno 506 (freedreno) ativa e validada ao vivo
+# em 2026-09-04 (ver docs/HARDWARE_STATUS.md) — usa o driver freedreno
+# real via GBM/EGL em vez do renderer por software. Ate 2026-09-03 este
+# kernel nao expunha GPU nenhuma ("msm_mdp: no GPU device was found"),
+# por isso o --renderer=pixman original; nao se aplica mais.
+ExecStart=/usr/bin/weston --backends=drm-backend.so,vnc-backend.so --renderer=gl --disable-transport-layer-security
 Restart=on-failure
 RestartSec=3
 TTYPath=/dev/tty1
