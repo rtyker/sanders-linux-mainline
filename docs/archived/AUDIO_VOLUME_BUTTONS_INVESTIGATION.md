@@ -189,7 +189,7 @@ timeout 10 cat /dev/input/event3 | od -A d -t x1
 - Após deploy, testar AMBOS os botões — pode ser que um funcione e o outro não ainda
 - Se o botão de volume UP funcionar mas não controlar volume do ALSA, verificar se o userspace (aplay/amixer) precisa de um daemon para reagir a KEY_VOLUMEUP/KEY_VOLUMEDOWN
 
-## 7. Associação com PipeWire (2026-09-04) — implementado, teste end-to-end INTERROMPIDO
+## 7. Associação com PipeWire (2026-09-04) — ✅ confirmado ao vivo, ponta-a-ponta
 
 Depois da confirmação ao vivo da seção 0, implementado um daemon simples
 (`rootfs-overlay/common/usr/local/bin/sanders-volume-keys.py`, instalado/
@@ -199,21 +199,22 @@ headless/server) que le `/dev/input/eventN` direto (resolve os devices pelo
 nome, nao por numero fixo) e chama `wpctl set-volume @DEFAULT_AUDIO_SINK@
 5%+`/`5%-` via `runuser -u alarm` a cada KEY_VOLUMEUP/DOWN.
 
-**Testado e confirmado:** o script detecta os devices corretos
-(`pm8941_resin` -> code 114, `gpio-keys` -> code 115) e roda sem erro.
+**Confirmado ao vivo em 2026-09-04 (mesmo dia, sessão seguinte):**
 
-**NÃO testado ainda:** se o `wpctl` de fato muda o volume — porque o
-PipeWire não estava rodando no device no momento do teste (trabalho de
-tornar PipeWire+WirePlumber o padrão ainda está pendente, ver
-`docs/ROADMAP_AND_TODOS.md` / `AUDIO_PIPEWIRE_TESTE.md`), e o teste ao
-vivo foi interrompido por um incidente não relacionado (aparelho travou
-no boot — ver `sanders-linux-mainline/docs/TROUBLESHOOTING.md` item 17)
-antes de conseguir subir uma sessão PipeWire pro usuário "alarm" e testar
-o fluxo completo com áudio tocando.
+1. `pipewire.service`/`pipewire-pulse.socket`/`wireplumber.service` habilitados
+   como padrão da sessão `--user` de `alarm` (`loginctl enable-linger alarm` +
+   `systemctl --user enable --now ...`). WirePlumber passou a enumerar o
+   ALSA card real ("Áudio interno", sink+source) via `wpctl status`.
+2. Teste manual de `wpctl set-volume` direto (sem os botões): 1.00 → 0.95 →
+   1.00, confirmando que o PipeWire de fato controla o volume de saída.
+3. Teste com os botões físicos de verdade, com o daemon
+   `sanders-volume-keys.service` rodando: Volume Down 3× levou 1.00 → 0.85
+   (exatamente 3×5%); Volume Up 2× levou 0.85 → 0.95 (exatamente 2×5%),
+   confirmado via `wpctl get-volume @DEFAULT_AUDIO_SINK@` antes/depois de
+   cada rodada e via `journalctl -u sanders-volume-keys.service` mostrando
+   cada `runuser -u alarm -- wpctl set-volume ...` disparado por tecla.
 
-**Para o próximo agente:** depois que o PipeWire estiver rodando como
-sessão padrão do usuário "alarm", testar apertando Volume Up/Down com
-áudio tocando e confirmar que o volume muda de verdade (`wpctl get-volume
-@DEFAULT_AUDIO_SINK@` antes/depois). Se o usuário de sessão do PipeWire
-mudar de "alarm" pra outro, ajustar `SANDERS_PIPEWIRE_USER=` na unit
-`sanders-volume-keys.service` (ou a env var default no próprio script).
+Não há mais pendência real neste ponto — o botão físico realmente muda o
+volume de áudio de saída, ponta-a-ponta. O trabalho de tornar PipeWire
+padrão (que antes bloqueava esse teste, ver `docs/ROADMAP_AND_TODOS.md` /
+`AUDIO_PIPEWIRE_TESTE.md`) foi concluído junto com esta validação.

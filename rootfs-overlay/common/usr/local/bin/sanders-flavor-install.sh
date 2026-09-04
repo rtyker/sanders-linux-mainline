@@ -99,6 +99,21 @@ EOF
 setup_volume_keys_service() {
     local tag="$1"
 
+    # PipeWire so aceita comandos do wpctl (via runuser -u alarm) se a
+    # sessao --user de "alarm" estiver de fato rodando pipewire+wireplumber.
+    # Sem isso o wpctl ate conecta (socket activation cria uma instancia
+    # efemera), mas sem WirePlumber nenhum device ALSA e enumerado — sem
+    # Sinks/Sources, "set-volume" nao tem o que controlar. Confirmado ao
+    # vivo 2026-09-04 (ver docs/archived/AUDIO_VOLUME_BUTTONS_INVESTIGATION.md
+    # secao 7): sem enable-linger + enable --now dos 3 units abaixo, o
+    # teste ponta-a-ponta com os botoes fisicos nao mudava o volume real.
+    echo "[$tag] Habilitando sessao PipeWire padrao para o usuario alarm..."
+    loginctl enable-linger alarm
+    runuser -u alarm -- bash -c '
+        export XDG_RUNTIME_DIR=/run/user/1000
+        systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service pipewire.service
+    '
+
     echo "[$tag] Instalando unit systemd das teclas de Volume Up/Down -> PipeWire..."
     cat > /etc/systemd/system/sanders-volume-keys.service <<'EOF'
 [Unit]
