@@ -141,7 +141,13 @@ setup_volume_keys_service() {
     cat > /etc/systemd/system/sanders-volume-keys.service <<'EOF'
 [Unit]
 Description=Volume Up/Down (evdev) -> PipeWire via wpctl (sanders)
-After=multi-user.target
+# After=systemd-user-sessions.service, NAO multi-user.target: a unit e
+# WantedBy=multi-user.target, e "After=multi-user.target" + want do
+# mesmo target = ciclo (o systemd apagava o job em todo boot; e como o
+# sanders-player.service e After= deste, o job do PLAYER tambem era
+# apagado — o player nunca subia no boot). Fix 2026-09-10 (BF) — ver
+# docs/KNOWN_ISSUES_AND_POTENTIAL_BUGS.md BUG-013.
+After=systemd-user-sessions.service
 
 [Service]
 Type=simple

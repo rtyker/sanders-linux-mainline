@@ -255,6 +255,23 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 - **Gravidade:** 🔵 Baixa
 - **Status:** ✅ **Corrigido (2026-09-03):** fallback trocado de path absoluto fixo (`/mnt/hdauxiliar/android/projeto_g5/stock/`) para `$REPO/../stock` (relativo ao submódulo via `lib.sh`), portável para qualquer clone do projeto que mantenha a mesma estrutura pai/submódulo. Override via `STOCK_ZIP` continua disponível.
 
+### 🟠 BUG-013: Ciclos de ordenação systemd em todo boot — jobs apagados (`sanders-zram`) e `sanders-player` que nunca subia
+- **Arquivos:** `rootfs-overlay/common/etc/systemd/system/sanders-zram.service`, `sanders-cpufreq.service` e a unit `sanders-volume-keys.service` gerada por `usr/local/bin/sanders-flavor-install.sh`
+- **Gravidade:** 🟠 Alta
+- **Status:** ✅ **Corrigido e confirmado ao vivo (2026-09-10, BF)**
+- **Descoberta:** incidental, durante a verificação de outro item do backlog — o `dmesg` do boot do kernel novo (DTS sem o nó de LED) mostrava `Found ordering cycle` + `Job ... deleted to break ordering cycle` em **todo boot**.
+- **Sintoma:** dois ciclos independentes:
+  1. `local-fs.target → sanders-zram.service → swap.target → var-log.mount/tmp.mount → local-fs` — o systemd apagava o job do zram (e em alguns boots os de `tmp.mount`/`var-log.mount`) pra quebrar o anel.
+  2. `multi-user.target → sanders-player.service → sanders-volume-keys.service → multi-user.target` — o job do **player GTK4 era apagado em todo boot: o serviço nunca chegou a iniciar sozinho** (ficava `inactive` para sempre).
+- **Causa raiz (dois padrões distintos):**
+  1. `sanders-volume-keys.service` e `sanders-cpufreq.service` combinavam `After=multi-user.target` com `[Install] WantedBy=multi-user.target`. O want cria o edge reverso (`multi-user.target` After= serviço); com o `After=` explícito na direção oposta, fecha ciclo. Como `sanders-player.service` é `After=sanders-volume-keys.service` e também wanted pelo target, o job dele era arrastado junto.
+  2. `sanders-zram.service` tinha `After=local-fs.target` + `Before=swap.target`; `swap.target` é Before= dos mounts tmpfs do fstab (`/tmp`, `/var/log`), que são Before= de `local-fs.target` → anel.
+- **Fix aplicado (repo + device):**
+  1. `sanders-volume-keys.service`/`sanders-cpufreq.service`: `After=systemd-user-sessions.service` no lugar de `multi-user.target` (a dependência real é a sessão de usuário/PipeWire, não o target que é pai deles).
+  2. `sanders-zram.service`: repensado como unidade de early-boot — `WantedBy=swap.target` (antes: `multi-user.target`), `DefaultDependencies=no`, `After=systemd-udevd.service`, `Before=swap.target` (mesmo padrão das units de swap geradas pelo próprio systemd; o `DefaultDependencies=no` é obrigatório porque o `After=sysinit.target` implícito de services fecharia novo anel com `swap.target` Before= sysinit). `systemctl reenable sanders-zram.service` no device pra trocar o symlink de wants.
+- **Validação:** `systemd-analyze verify` nas 7 units envolvidas → rc=0 (antes: dezenas de linhas de ciclo); reboot ao vivo com **0** ocorrências de "ordering cycle" no dmesg; `sanders-player.service` **active** pela primeira vez; zram swap ativo (889M, prio 100); `systemctl --failed` vazio.
+- **Lição pro projeto:** serviço `WantedBy=X.target` **nunca** deve declarar `After=X.target`; e unidades que preparam swap antes do sysinit precisam de `DefaultDependencies=no`.
+
 ---
 
 ## 📊 Matriz Consolidada de Bugs e Gravidades
@@ -273,6 +290,7 @@ Este documento reúne a auditoria técnica exaustiva realizada no repositório *
 | **BUG-010** | Kconfig / DT APCS | Ausência de driver APCS impede funcionamento do `cpufreq-dt` | 🟡 Média | Mapeado (Scaffolding) |
 | **BUG-011** | `sanders-timesync.sh` | Bloqueio por timeout se resolução DNS via `getent` for lenta | 🟡 Média | Melhorado (mensagem correta) — bloqueio bounded é aceito por design |
 | **BUG-012** | `sanders-server-setup.sh` | Risco de *partial upgrade* no Arch Linux ao usar `pacman -Sy` | 🟡 Média | ✅ **Corrigido** (2026-09-02) |
+| **BUG-013** | systemd units (`sanders-zram`/`volume-keys`/`cpufreq`) | Ciclos de ordenação apagavam jobs em todo boot — `sanders-player` nunca iniciava | 🟠 Alta | ✅ **Corrigido, confirmado ao vivo** (2026-09-10, BF) |
 
 ---
 
@@ -291,5 +309,5 @@ Depois de um reflash da rootfs (corrigiu uma corrupção ext4 não relacionada a
 - **Não testado neste boot:** Docker, restauração de MAC do Bluetooth, fonte do console (`vconsole`) — o build usado não tinha os pacotes extras instalados (docker, bluez-utils, terminus-font). Não é regressão de nenhum fix desta sessão, é ausência de pacote; revalidar quando esses pacotes forem instalados.
 
 ---
-*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02. Verificação ao vivo e correção do BUG-005 por Claude em 2026-09-02. Revisão adicional em 2026-09-02: reincorporação dos itens abertos (BUG-A1..A10) omitidos pela reindexação de 12 itens, com estado validado contra o código real. Nenhum fonte foi modificado nesta revisão — apenas este documento.*
+*Relatório de auditoria técnica corrigido e atualizado pelo Antigravity em 2026-09-02. Verificação ao vivo e correção do BUG-005 por Claude em 2026-09-02. Revisão adicional em 2026-09-02: reincorporação dos itens abertos (BUG-A1..A10) omitidos pela reindexação de 12 itens, com estado validado contra o código real. Descoberta, correção e validação ao vivo do BUG-013 por **BF** em 2026-09-10. Nenhum fonte foi modificado nesta revisão — apenas este documento.*
 

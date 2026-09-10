@@ -1,6 +1,16 @@
 [Unit]
 Description=Inicializa Swap ZRAM em RAM (Otimização de eMMC)
-After=local-fs.target
+# Anel original (fix 2026-09-10, BF — ver
+# docs/KNOWN_ISSUES_AND_POTENTIAL_BUGS.md BUG-013): After=local-fs.target
+# + Before=swap.target fechava local-fs -> swap.target ->
+# var-log.mount/tmp.mount -> local-fs e o systemd apagava jobs em todo
+# boot.
+# DefaultDependencies=no: com WantedBy=swap.target, o After=sysinit.target
+# implicito dos services fecha OUTRO anel (swap.target e Before=sysinit
+# por padrão). Mesmo padrão das units de swap geradas pelo próprio
+# systemd pro early boot.
+DefaultDependencies=no
+After=systemd-udevd.service
 Before=swap.target
 
 [Service]
@@ -9,4 +19,4 @@ ExecStart=/usr/local/bin/sanders-zram.sh
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=swap.target
