@@ -315,7 +315,7 @@ Se a tabela APID estiver vazia/incompleta, as opções são:
 - **Upstream msm8953.dtsi:** `arch/arm64/boot/dts/qcom/msm8953.dtsi` (linha 2179)
 - **Upstream pm8953.dtsi:** `arch/arm64/boot/dts/qcom/pm8953.dtsi` (linha 37-187)
 - **Nosso DTS:** `sanders-linux-mainline/dts/msm8953-motorola-sanders.dts` (linha 620+)
-- **Áudio plan:** `docs/AUDIO_SUBSYSTEM_PLAN.md` (seção 4)
+- **Áudio plan:** `docs/archived/AUDIO_SUBSYSTEM_PLAN.md` (seção 4)
 - **Downstream Android driver:** `https://android.googlesource.com/kernel/msm/+/refs/heads/android-msm-mako-3.4-jb-mr1/drivers/spmi/spmi-pmic-arb.c`
 
 ---

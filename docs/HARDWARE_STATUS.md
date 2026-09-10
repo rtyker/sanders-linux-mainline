@@ -1,12 +1,12 @@
 # Hardware status
 
-Última atualização: 2026-05-21.
+Última atualização: 2026-09-10.
 
 ## Visão geral
 
 | Componente | Status | Notas |
 |---|---|---|
-| Kernel mainline boot | ✅ | Linux master (~v6.x), defconfig + fragment |
+| Kernel mainline boot | ✅ | Linux master (~v6.x/v7.x), defconfig + fragment |
 | eMMC | ✅ | `mmcblk0` 29.1 GiB, GPT, todas 54 partições visíveis |
 | ext4 rootfs | ✅ | Montado via `blkid -L rootfs` (sem udev no initramfs) |
 | systemd / userspace Arch ARM | ✅ | Boot até shell root (autologin no tty1 via drop-in `getty@tty1.service.d/autologin.conf`) |
@@ -26,7 +26,7 @@
 | Modem (telefonia/dados) | ❌ | — |
 | Câmera | ❌ | — |
 | Proximidade + luz ambiente (LiteON LTR559) | ⚠️ | I2C @ bus 1 / 0x23 probou OK no driver mainline `ltr501`. `/sys/bus/iio/devices/iio:device0/in_proximity_raw` reage a obstrução (variações 700–960). ALS (`in_intensity_*`, `in_illuminance_input`) trava em 0 — driver inicializa ALS_CONTR mas o chip não emite ALS_RDY no STATUS. Calibração de threshold de proximidade ainda crua (stock usava `ps-threshold=800`, mainline binding só expõe `proximity-near-level` semântico). |
-| Acelerômetro / giroscópio / magnetômetro | ❌ | **Não** estão em I2C no stock — passam pela SSC (Sensor Subsystem) no SLPI/DSP, caminho proprietário (`sns_dsps` blob + IPC QMI). Sem driver mainline prático hoje. Bloqueia autorotate do Phosh. |
+| Acelerômetro / giroscópio / magnetômetro | 🟡 | Roteados internamente ao Qualcomm Hexagon ADSP (não SLPI). Pilha QMI confirmada via QRTR (`qrtr-lookup` detecta `SNS_SMGR` no port 256). FastRPC in-kernel dispensado. Leitura de dados requer cliente userspace (`libssc`/`sns_client`). Ver `docs/FASTRPC_AND_SENSORS_SUBSYSTEM_PLAN.md`. |
 | GPU (Adreno 506) | ✅ | freedreno ativo — `/dev/dri/card1` + `renderD128`, `revision: 506` confirmado via `/sys/kernel/debug/dri/1/gpu`, ringbuffer com fence avançando. Precisou de 3 ajustes além do kernel config (`CONFIG_DRM_MSM_DPU`/`QCOM_MDT_LOADER`): (1) `&gpu { status = "okay"; }` no DTS — upstream atual traz o nó desabilitado por padrão; (2) firmware genérico `a530_pm4.fw`/`a530_pfp.fw` (microcode PM4/PFP do a5xx, nome herdado do a530 mas compartilhado por toda a família incl. a506) — não vem do stock zip, copiado do `potter-linux-mainline/firmware/`; (3) endereço da `zap_shader_region` sobrescrito de `0x81800000` (colidia com o segmento de código do próprio kernel nesta build, causando falha silenciosa na reserva de memória e `ENOMEM` no load do zap shader) para `0x92100000` (RAM livre confirmada via `/proc/iomem`). Validado ao vivo em 2026-09-04. Renderização real confirmada de duas formas: (1) `mesa-utils`/`eglinfo` (`EGL_PLATFORM=surfaceless`) reporta `vendor: freedreno` / `renderer: FD506` via GBM/EGL direto; (2) **Weston puro (`weston --renderer=gl`, sem VNC/Xwayland/config extra) rodando com GPU real, output DSI-1 habilitado, confirmado visualmente na tela física do aparelho** (compositor renderizado, não mais preto). GPU 100% funcional de ponta a ponta, inclusive scanout real. Nota: `Xorg` com o driver `modesetting`+glamor (flavor `xorg-minimal`) **não funciona** com esse painel — ver bug do painel DSI abaixo. |
 | LED de notificação frontal | ⚠️ | Enumerado como `/sys/class/leds/white:notification` via `gpio-leds` no MPP2 do pmi8950 (DTS + `CONFIG_LEDS_GPIO=y`). `echo 1 > brightness` retorna sucesso mas **validação visual pendente** — usuário ainda não viu o LED acender fisicamente. Pode precisar inverter polaridade (`GPIO_ACTIVE_LOW`) ou trocar pra `pmi8950_pwm`+`leds-pwm`. |
 
@@ -246,9 +246,7 @@ Qualcomm-specific, semanas de trabalho), nao da pra inferir o que
 `hal_config_bss` quer diferente. Todas as structs visiveis batem. Os
 fixes acima sao upstream-quality, mas o problema raiz e firmware-side.
 
-**Estado atual:** hipótese do fallback V0 preparada, mas ainda não validada no aparelho.
-Retomar após o teste WPA2; se falhar, considerar o bloqueio firmware-side e preservar o
-workaround USB CDC ECM.
+**Resolução Definitiva (2026-09-03):** O bug foi investigado e solucionado com sucesso! A hipótese do fallback V0 puro foi falsificada, mas a causa raiz real foi isolada: o firmware stock da Pronto (API 1.5.1.2) não concede a capacidade `DOT11AC` (VHT) na troca de capacidades, e o driver mainline assumia suporte a VHT puramente com base no `rf_id` (RF_IRIS_WCN3680), enviando o layout V1 completo que a firmware rejeitava com `MEM_FAIL=5`. Criado o patch `kernel/0002-wcn36xx-wcn3680-novht-fallback.patch` que checa a capacidade `DOT11AC` real e utiliza o formato V1-NOVHT. Handshake WPA2 completo, DHCP e conexão à internet 100% operantes (HT/802.11n). Detalhes em `docs/archived/WCN36XX_WIFI_FIX.md`.
 
 ### Bluetooth WCN3680B — ✅ FUNCIONANDO
 
@@ -360,20 +358,11 @@ via `CONFIG_LTR501=y` + `CONFIG_IIO=y` (builtin).
    ser feita em userspace (subtrair baseline) ou patchar driver pra
    ler offset do DT.
 
-**Acel/giro/magnetômetro:** nada disso está em I2C no sanders. O stock
-DTS confirma: só LTR559 e FT5436 no i2c_7/i2c_3. Sensores de movimento
-passam pela SSC do msm8953 (LPASS/SLPI), via `sns_dsps` (firmware) e
-IPC QMI — sem driver mainline prático. Bloqueia autorotate.
+**Acel/giro/magnetômetro:** roteados internamente para o Hexagon ADSP (o MSM8953 não possui SLPI; o subsistema de sensores legado é o DSPS/SSC rodando no ADSP). Em 2026-09-04, a pilha IPC QMI foi validada com sucesso via QRTR: o utilitário `qrtr-lookup` localizou os serviços `SNS_SMGR` (porta 256) e de controle (porta 43) publicados pelo ADSP via socket `AF_QIPCRTR`. O acesso a esses sensores não necessita de driver de kernel IIO nem de FastRPC; pode ser implementado via daemon userspace (`libssc`/`sns_client`). Detalhes consolidados em `docs/FASTRPC_AND_SENSORS_SUBSYSTEM_PLAN.md`.
 
-### Painel de display
+### Painel de display — ✅ FUNCIONANDO
 
-Nenhum driver mainline para Tianma NT35596 ou DJN ILI7807D específico
-do sanders. Opções:
-
-- Verificar drivers similares (`drivers/gpu/drm/panel/`) — pode haver
-  algo compatível.
-- Escrever um driver (sub-projeto significativo).
-- Continuar usando simple-framebuffer (o que temos hoje).
+**Resolvido em 2026-09-03.** Driver de painel nativo MIPI-DSI integrado via DRM MSM (`kernel/0004-drm-panel-potter-tianma-boe.patch`), suportando tanto Tianma TL052VDXP02 quanto BOE BS052FHM-A00-6C01. Painel nativo 1080x1920 portrait com controle de brilho WLED via `/sys/class/backlight/backlight/brightness`. O bootloader `lk2nd` detecta o painel no boot e ajusta a device tree dinamicamente. Framebuffer DRM nativo (`msmdrmfb`) substitui com sucesso o antigo `simple-framebuffer`. Detalhes em `docs/archived/DISPLAY_PANEL_PLAN.md`.
 
 ## Flavors de rootfs
 
@@ -393,11 +382,8 @@ Arquivos versionados específicos do desktop ficam em
 
 ## Métricas atuais
 
-- Tamanho do `boot-sanders.img`: ~16 MiB (cabe na partição `boot` de
-  15.5 MiB? **Não** — por isso usamos `fastboot boot` em vez de
-  `fastboot flash boot`, que é bloqueado pelo bootloader Motorola
-  mesmo desbloqueado).
-- Tempo de cold boot (lk2nd → login prompt): ~30s.
-- RAM usada por systemd em idle: não medido (sem console).
-- Temperatura do device: aquece levemente (CPU sem governor adequado,
-  provavelmente).
+- **Boot Autônomo e Definitivo:** `lk2nd` gravado permanentemente nas partições `boot` (`mmcblk0p37`) e `recovery` (`mmcblk0p38`). Carrega o kernel mainline e DTBs da partição `cache` (`mmcblk0p52`, ext2) via extlinux (`/extlinux/extlinux.conf`).
+- **Deploy de Kernel:** Atualização normal realizada via SCP para a partição `cache` (`10-deploy-boot.sh`), mantendo backup do kernel anterior. O modo fastboot (`07-boot-kernel.sh`) é estritamente reservado para recuperação de emergência.
+- **Rootfs:** Partição `userdata` (`mmcblk0p54`, ext4) persistente com Arch Linux ARM64.
+- **Tempo de cold boot:** ~25-30s da tomada até prompt de login / SSH ativo.
+- **Aceleração 3D:** GPU Adreno 506 via `freedreno` ativa (`renderD128`) com Weston GL e Xwayland vsync-locked a ~58-60 FPS.

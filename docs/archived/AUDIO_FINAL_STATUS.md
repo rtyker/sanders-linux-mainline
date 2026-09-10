@@ -99,5 +99,5 @@ amixer -c 0 sset 'SPK DAC' on
 | `docs/archived/AUDIO_SPMI_USID1_INVESTIGATION.md` | Investigação completa do bug SPMI (21KB) |
 | `docs/archived/AUDIO_MCLK_INVESTIGATION.md` | Investigação do bloqueador MCLK/PCM EINVAL (8KB) |
 | `docs/archived/AUDIO_FINAL_STATUS.md` | Este arquivo — resumo final |
-| `docs/AUDIO_SUBSYSTEM_PLAN.md` | Plano técnico atualizado |
+| `docs/archived/AUDIO_SUBSYSTEM_PLAN.md` | Plano técnico atualizado |
 | `docs/ROADMAP_AND_TODOS.md` | Roadmap com status atual |

@@ -715,7 +715,7 @@
 	 * isso estava errado: o hardware real TEM chip na USID 1, so o
 	 * nosso kernel mainline nao esta enumerando essa USID direito (bug
 	 * separado no lado do SPMI PMIC arbiter/mfd, nao um problema deste
-	 * DTS). Revertido pra pmic@1 — ver docs/AUDIO_SUBSYSTEM_PLAN.md
+	 * DTS). Revertido pra pmic@1 — ver docs/archived/AUDIO_SUBSYSTEM_PLAN.md
 	 * secao 4 pra investigacao completa da causa raiz da USID 1.
 	 */
 	pmic@1 {

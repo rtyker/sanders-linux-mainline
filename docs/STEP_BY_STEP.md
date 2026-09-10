@@ -139,56 +139,57 @@ Saída: `build/out/boot-sanders.img` (~16 MiB).
 
 ## 07. Flash e boot
 
-### Primeira vez (com flash do rootfs)
+### Provisionamento Inicial Completo (Flash do eMMC)
+
+Para gravar permanentemente o bootloader `lk2nd`, formatar a partição de boot `cache` (ext2) e flashar o sistema de arquivos `userdata` (ext4):
 
 ```bash
-./scripts/07-flash-and-boot.sh --flash
+sudo ./scripts/99-flash-rootfs-final.sh
 ```
 
-⚠️ **APAGA o `/data` do Android.** O script pergunta antes.
+⚠️ **APAGA os dados do aparelho.** O script solicita confirmação antes de prosseguir.
 
-Sequência:
-1. Aparelho em fastboot (power-off, depois power + vol↓).
-2. Script roda `fastboot boot lk2nd.img` → tela do lk2nd.
-3. Script roda `fastboot flash userdata rootfs-arch.img` (~3 min,
-   sparse 5 chunks).
-4. Script roda `fastboot boot boot-sanders.img`.
-5. Aguarda ~60s.
+Sequência realizada:
+1. Aparelho em modo fastboot (desligar, depois segurar Power + Vol↓).
+2. Grava permanentemente o `lk2nd.img` nas partições `boot` (`mmcblk0p37`) e `recovery` (`mmcblk0p38`).
+3. Formata e grava a partição `cache` (`mmcblk0p52`, ext2 com rótulo `boot`) contendo `/extlinux/extlinux.conf`, `Image.gz` e DTBs.
+4. Grava o rootfs Arch Linux ARM na partição `userdata` (`mmcblk0p54`, ext4).
+5. Reinicia o aparelho para boot autônomo.
 
-### Iterações seguintes
+### Deploy Normal de Novo Kernel / DTB (Aparelho em Execução)
 
-Já flashou rootfs uma vez? Não precisa flashar de novo:
+Com o aparelho já inicializado e conectado via rede USB (`usb0` @ `10.42.0.2`):
 
 ```bash
-./scripts/07-flash-and-boot.sh        # só carrega lk2nd + boot do kernel
+sudo ./scripts/08-host-net.sh           # Se reconectou o cabo USB
+./scripts/10-deploy-boot.sh --reboot   # Copia kernel/DTBs para o cache e reinicia
+```
+
+### Recuperação de Emergência (Fastboot RAM Boot)
+
+Caso uma modificação cause falha no boot (boot hang), entre no Fastboot de fábrica (Power + Vol↓) e restaure a imagem de boot ou execute boot transitório via RAM:
+
+```bash
+./scripts/07-boot-kernel.sh
+# Ou restaure a partição cache via fastboot:
+fastboot flash cache build/out/boot-cache.img
 ```
 
 ### O que esperar na tela
 
-1. **Logo Motorola** (resíduo do bootloader anterior, ~2-3s).
-2. **Texto rolando rapidamente** — dmesg do kernel no framebuffer
-   console. Visualmente: padrão de linhas pequenas inclinadas (display
-   está em portrait, console renderiza em landscape).
-3. **Linhas do init:** `[init] procurando rootfs...`, `[init.blkid]
-   /dev/mmcblk0pNN: LABEL=...`, `[init] ROOT=/dev/mmcblk0p54`,
-   `EXT4-fs ... mounted`, `[init] switch_root...`.
-4. **systemd Arch:** texto rola mais devagar, várias linhas `[ OK ]
-   Started ...`.
-5. **`Welcome to Arch Linux ARM`**
-6. **`archlinuxarm login:`** 🎉
-
-Veja [`screenshots/`](screenshots/) para exemplos reais.
+1. **Logo Motorola** (resíduo do bootloader ABOOT de fábrica, ~2-3s).
+2. **Tela do lk2nd** (segundo estágio Little Kernel, ~1-2s).
+3. **Texto rolando no painel nativo MIPI-DSI:** dmesg do kernel e mensagens do initramfs.
+4. **systemd Arch Linux ARM:** inicialização dos serviços do sistema.
+5. **Prompt de Login / Interface Gráfica:** `archlinuxarm login:` no console ou ambiente gráfico Wayland/X11 se habilitado.
 
 ---
 
 ## Iteração rápida (após mudar kernel/DTS/init)
 
 ```bash
-./scripts/02-build-kernel.sh         # se mudou DTS ou kernel config
-./scripts/04-build-initramfs.sh      # se mudou init
-./scripts/06-build-boot.sh           # sempre
-./scripts/07-flash-and-boot.sh       # boot transitório, sem --flash
+./scripts/02-build-kernel.sh         # compila kernel/DTS
+./scripts/04-build-initramfs.sh      # se alterou o initramfs
+./scripts/06-build-boot.sh           # gera os pacotes de boot e boot-cache.img
+./scripts/10-deploy-boot.sh --reboot # envia via SSH/SCP diretamente para a partição cache
 ```
-
-`fastboot boot` é **não-destrutivo** — só carrega na RAM. Você pode
-iterar dezenas de vezes sem afetar a userdata flashada anteriormente.
