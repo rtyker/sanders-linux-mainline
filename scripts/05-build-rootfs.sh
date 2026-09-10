@@ -112,6 +112,7 @@ if command -v arch-chroot >/dev/null && [ -f /proc/sys/fs/binfmt_misc/qemu-aarch
         samba terminus-font bluez bluez-utils \
         alsa-utils alsa-ucm-conf \
         || die "pacman -S pacotes base falhou"
+    arch-chroot "$MNT" systemctl enable bluetooth.service >/dev/null 2>&1 || true
 
     if [ "$FLAVOR" = "desktop" ]; then
         msg "instalando stack desktop (weston + xwayland + mesa) via arch-chroot..."
@@ -230,7 +231,6 @@ MACAddress=02:55:44:33:22:11
 
 [Network]
 Address=10.42.0.2/24
-Gateway=10.42.0.1
 DNS=8.8.8.8
 DNS=1.1.1.1
 ConfigureWithoutCarrier=yes

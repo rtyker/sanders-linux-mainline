@@ -46,7 +46,7 @@ DSI_CONNECTOR="DSI-1"
 list_flavors() {
     echo "Flavors disponiveis:"
     echo "  minimal          — apenas diagnostico, nenhum pacote instalado (roda sanders-server-setup.sh --status)"
-    echo "  server           — ferramentas basicas de servidor: htop, git, curl, vim, fastfetch, docker (instalado mas NUNCA habilitado por padrao), bluez-utils"
+    echo "  server           — ferramentas basicas de servidor: htop, git, curl, vim, fastfetch, docker (instalado mas NUNCA habilitado por padrao), bluez, bluez-utils"
     echo "  xorg             — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900) + teclas de Volume -> PipeWire [FALLBACK — Xorg trava o painel DSI em alguns casos, prefira weston-minimal]"
     echo "  weston-minimal   — Weston (compositor Wayland minimo, sem shell/painel extra) com GPU real (freedreno), backend VNC nativo (:5900) + teclas de Volume -> PipeWire [PREFERENCIAL]"
     echo "  xfce             — Xorg + XFCE4 (desktop leve via X11, tty1) + x11vnc (:5900) + teclas de Volume -> PipeWire"
@@ -199,7 +199,7 @@ flavor_server_install() {
 
 flavor_server_remove() {
     echo "[flavor:server] Este flavor nao tem servico proprio pra desabilitar"
-    echo "(htop/git/curl/vim/fastfetch/docker/bluez-utils continuam instalados —"
+    echo "(htop/git/curl/vim/fastfetch/docker/bluez/bluez-utils continuam instalados —"
     echo "remova pacotes individuais via 'pacman -R <pacote>' se quiser)."
 }
 

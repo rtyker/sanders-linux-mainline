@@ -68,7 +68,30 @@ show_status() {
 
     # 7. Armazenamento e /etc/fstab
     echo -e "\n--- [ Armazenamento ] ---"
-    df -h / /tmp /mnt/microsd 2>/dev/null | awk 'NR==1||NR>1' || true
+    local mnts="/ /tmp"
+    if awk '$2=="/mnt/microsd" && $3!="autofs" {found=1} END {exit !found}' /proc/mounts 2>/dev/null; then
+        mnts="$mnts /mnt/microsd"
+    fi
+    df -h $mnts 2>/dev/null | awk 'NR==1||NR>1' || true
+
+    # 8. Bluetooth (WCN3680B)
+    echo -e "\n--- [ Bluetooth ] ---"
+    if [ -d /sys/class/bluetooth/hci0 ]; then
+        local bt_mac
+        bt_mac=$(script -qc "btmgmt --index 0 info" /dev/null 2>/dev/null | awk '/^[[:space:]]*addr / {print $2; exit}')
+        [ -z "$bt_mac" ] && bt_mac="Desconhecido"
+        local bt_pwr
+        bt_pwr=$(rfkill list bluetooth 2>/dev/null | awk '/Soft blocked:/ {print ($3=="yes"?"Desligado (rfkill)":"Ligado")}')
+        [ -z "$bt_pwr" ] && bt_pwr="Ligado"
+        echo "Controller: hci0 ($bt_mac) - $bt_pwr"
+        if systemctl is-active --quiet bluetooth 2>/dev/null; then
+            echo "Daemon: bluetoothd ATIVO"
+        else
+            echo "Daemon: bluetoothd Inativo"
+        fi
+    else
+        echo "Controller: Inativo / Não detectado"
+    fi
 
     echo "====================================================="
 }
@@ -93,8 +116,11 @@ install_packages() {
         # de containers, nao precisa dos dois) nem tmux (decidido
         # 2026-09-04, sem necessidade real pra este uso).
         pacman -Syu --noconfirm --needed \
-            htop git curl vim fastfetch docker bluez-utils \
+            htop git curl vim fastfetch docker bluez bluez-utils \
             || echo "[sanders-server] WARN: falha instalando alguns pacotes via pacman"
+
+        # Habilita bluetooth.service de forma idempotente (ordenado pos sanders-bt-mac)
+        systemctl enable bluetooth.service >/dev/null 2>&1 || true
 
         # docker fica instalado mas NUNCA habilitado por padrao — este e o
         # flavor "server" headless, nao deve subir o daemon de containers
