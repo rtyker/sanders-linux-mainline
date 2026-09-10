@@ -78,23 +78,15 @@
 			linux,code = <KEY_VOLUMEUP>;
 		};
 	};
-
 	/*
-	 * LED de notificacao frontal — branco unico, ligado no MPP2 do
-	 * pmi8950 como current-sink. Downstream Moto (qpnp-leds) usava modo
-	 * "manual" com source-sel=1 e current=5mA. No mainline atual nao ha
-	 * driver MPP-as-current-sink; usamos leds-gpio (on/off apenas).
-	 * Brilho/PWM via pmi8950_pwm fica como upgrade futuro.
+	 * LED de notificacao frontal: NAO EXISTE no XT1683/potter (validado
+	 * 2026-09-10 — ver docs/archived/RELATORIO_INVESTIGACAO_LED_FRONTAL.md). O
+	 * unico caminho de hardware seria o ATC LED do PMI8950 (BAT_IF reg
+	 * 0x1243, /sys/class/leds/charging no stock), mas o componente esta
+	 * ausente ou a trilha nao chega ao difusor: escritas verificadas em
+	 * 0x1243 (solid/blink1/blink2) e com caminho de carga habilitado
+	 * (0x1242=0x00) nao produziram luz visivel. Nao re-adicionar.
 	 */
-	leds {
-		compatible = "gpio-leds";
-
-		led-notification {
-			label = "white:notification";
-			gpios = <&pmi8950_mpps 1 GPIO_ACTIVE_HIGH>;
-			default-state = "off";
-		};
-	};
 
 	reserved-memory {
 		qseecom_mem: qseecom@84300000 {

@@ -469,3 +469,90 @@ recuperação. Se um deploy travar o boot de forma misteriosa mesmo assim,
 comparar o tamanho do `Image.gz` contra o último build que funcionou
 continua sendo um sinal rápido de diagnóstico (diferença de vários MB é
 suspeita).
+
+## 19. LED frontal de notificação nunca acende (sysfs/SPMI "funcionam" mas nenhuma luz aparece) — componente inexistente no XT1683
+
+**Data:** 2026-09-10 (investigação encerrada)
+**Status:** ✅ Causa definitiva encontrada — **hardware não povoado; não é bug de software. Não re-abrir.**
+
+**Sintoma:** escrever em `/sys/class/leds/white:notification/brightness`
+ou direto no registrador SPMI do LED ATC do PMI8950 (`0x1243`, via
+`moto_led`/MMIO) retorna sucesso e a leitura de volta confirma o valor —
+mas **nenhuma luz aparece** no difusor da grade do alto-falante, nem no
+escuro.
+
+**Causa raiz:** o Moto G5 Plus XT1683 RETBR (unidade de bancada
+`potter`) **não possui o LED frontal povoado** (ou a trilha não chega ao
+difusor ótico). Investigação exaustiva em 3 fases — varredura pulsada de
+todos os GPIOs/MPPs livres dos PMICs, engenharia reversa do driver stock
+`atc_leds` (LED ATC, BAT_IF `0x1243`, bits [2:1], max_brightness=3), e
+escritas diretas verificadas em todos os modos (solid ON, blink 1/2,
+10 blinks software) incluindo com o caminho analógico de carga habilitado
+(`0x1242=0x00` com unlock `0x12D0=0xA5`) — confirmada visualmente pelo
+usuário em duas sessões: **nada acendeu**. Relatos históricos de outros
+donos de XT1683 no XDA corroboram. No stock o LED era só "sign of life"
+(bateria em descarga profunda), e mesmo esse caminho está morto nesta
+variante.
+
+**Solução:** nenhuma — não há o que consertar em software. Limpeza já
+executada em 2026-09-10: nó fictício `white:notification` **removido do
+DTS** (comentário no próprio `dts/msm8953-motorola-sanders.dts` explica e
+proíbe re-adicionar), `sanders-led.service`/`.timer`/`sanders-led.sh`
+removidos do rootfs-overlay e do aparelho, kernel recompilado/deployado e
+verificado ao vivo (`/proc/device-tree` sem nó `leds`, `systemctl
+--failed` limpo). **Não re-adicionar o nó nem recriar os serviços.**
+Detalhes completos da investigação:
+`docs/archived/RELATORIO_INVESTIGACAO_LED_FRONTAL.md`; veredito formal em
+`docs/HARDWARE_REFERENCE.md` (seção LEDs) e em
+`sanders-linux-mainline/docs/HARDWARE_STATUS.md`.
+
+*Investigação executada e encerrada por **BF** (agente Codebuff),
+2026-09-10.*
+
+## 20. Host de build Debian sem toolchain cross (`aarch64-linux-gnu-gcc`, `dtc`, `mkbootimg`) e sem `pacman` — build do kernel via Docker
+
+**Data:** 2026-09-10
+**Status:** ✅ Resolvido com container; receita commitada no repo.
+
+**Sintoma:** `02-build-kernel.sh` falha com `comando
+'aarch64-linux-gnu-gcc' não encontrado` no host Debian 13. O
+`00-setup-host.sh` é escrito pra Arch (`pacman`) e só imprime dicas de
+tradução pra outras distros — e o `sudo` deste host exige senha
+interativa (indisponível pra agentes), então não dá pra instalar
+`gcc-aarch64-linux-gnu`, `device-tree-compiler` e `mkbootimg` via apt.
+
+**Causa:** os builds anteriores rodaram no host de bancada Arch. O host
+Debian atual tem `flex`/`bison`/`bc`/`ccache`/`gcc` nativo, mas nenhum
+cross-compiler arm64 nem as ferramentas de empacotamento de boot.
+
+**Solução:** Docker (o usuário já está no grupo `docker`), com o projeto
+bind-mountado e o ccache do projeto reaproveitado. Receita commitada em
+`scratch/kbuild-docker/Dockerfile` (imagem `sanders-kbuild:bookworm`:
+`gcc-aarch64-linux-gnu`, `binutils-aarch64-linux-gnu`,
+`device-tree-compiler`, `bc flex bison`, `ccache`, `libssl-dev
+libelf-dev`, `mkbootimg`, `e2fsprogs`, `git`). Uso:
+
+```bash
+docker build -q -t sanders-kbuild:bookworm scratch/kbuild-docker/
+docker run --rm -u 1000:1000 \
+  -v /mnt/hdauxiliar/android/projeto_g5:/proj \
+  -w /proj/sanders-linux-mainline/scripts \
+  sanders-kbuild:bookworm ./02-build-kernel.sh   # e depois ./06-build-boot.sh
+```
+
+- Rodar com `-u 1000:1000` pra os artefatos ficarem com o dono do host
+  (`anderson`, uid 1000).
+- O `CCACHE_DIR` do container aponta pra `/proj/cache_ccache_aarch64`
+  (mesmo cache do host) — ccache reutiliza normalmente entre container e
+  host.
+- Timing observado: build de v7.2 com ~69% de cache miss ≈ **40 min**;
+  builds incrementais/só-DTB levam segundos.
+- O deploy não muda: `10-deploy-boot.sh --reboot <IP>` roda no host
+  (só precisa de `ssh`/`scp`).
+- **Armadilha pra agentes:** processos em background lançados num comando
+  SYNC morrem quando o comando retorna — para builds longos usar
+  `setsid nohup ... &` + polling do log (o modo BACKGROUND da tool de
+  terminal não está implementado nesta sessão).
+
+*Configurado e validado ponta a ponta (build + deploy + boot verificado)
+por **BF** (agente Codebuff), 2026-09-10.*
