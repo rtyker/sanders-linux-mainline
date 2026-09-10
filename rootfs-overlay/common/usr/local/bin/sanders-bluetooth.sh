@@ -70,7 +70,7 @@ cmd_status() {
     echo -e "\n--- [ Dispositivos Pareados ] ---"
     if command -v bluetoothctl >/dev/null 2>&1 && systemctl is-active --quiet bluetooth 2>/dev/null; then
         local devs
-        devs=$(bluetoothctl paired-devices 2>/dev/null || true)
+        devs=$(bluetoothctl devices Paired 2>/dev/null || true)
         if [ -n "$devs" ]; then
             echo "$devs" | awk '{ printf "  • %-18s %s\n", $2, substr($0, index($0,$3)) }'
         else
@@ -107,32 +107,36 @@ cmd_off() {
 
 cmd_scan() {
     require_controller
-    local timeout_sec="${1:-10}"
+    local timeout_sec="${1:-5}"
     echo "[sanders-bluetooth] Iniciando varredura por ${timeout_sec}s..."
 
+    # Garante que o controlador esta ativo com LE e BR/EDR
+    btmgmt --index 0 power on >/dev/null 2>&1 || true
+    btmgmt --index 0 le on >/dev/null 2>&1 || true
+
+    echo -e "\n--- [ Dispositivos Descobertos ] ---"
+    timeout "${timeout_sec}" btmgmt --index 0 find 2>/dev/null | awk '
+        /dev_found:/ {
+            addr = $3;
+            rssi = $8;
+        }
+        /name / {
+            name = substr($0, index($0,$2));
+            if (addr != "") {
+                printf "  %-18s (RSSI %4s dBm) %s\n", addr, rssi, name;
+                addr = "";
+            }
+        }
+    ' || true
+
+    # Se bluetoothd estiver ativo, tambem lista o cache de devices descobertos
     if command -v bluetoothctl >/dev/null 2>&1 && systemctl is-active --quiet bluetooth 2>/dev/null; then
-        bluetoothctl power on >/dev/null 2>&1 || true
-        # Varredura via bluetoothctl
-        timeout "${timeout_sec}" bluetoothctl --timeout "${timeout_sec}" scan on 2>/dev/null || true
-        echo -e "\n--- [ Dispositivos Descobertos ] ---"
-        bluetoothctl devices 2>/dev/null | awk '{ printf "  %-18s %s\n", $2, substr($0, index($0,$3)) }'
-    else
-        # Fallback via btmgmt se bluetoothd estiver desligado
-        btmgmt --index 0 power on >/dev/null 2>&1 || true
-        btmgmt --index 0 le on >/dev/null 2>&1 || true
-        timeout "${timeout_sec}" btmgmt --index 0 find 2>/dev/null | awk '
-            /dev_found:/ {
-                addr = $3;
-                rssi = $8;
-            }
-            /name / {
-                name = substr($0, index($0,$2));
-                if (addr != "") {
-                    printf "  %-18s (RSSI %4s dBm) %s\n", addr, rssi, name;
-                    addr = "";
-                }
-            }
-        ' || true
+        local btc_devs
+        btc_devs=$(bluetoothctl devices 2>/dev/null || true)
+        if [ -n "$btc_devs" ]; then
+            echo -e "\n--- [ Cache BlueZ ] ---"
+            echo "$btc_devs" | awk '{ printf "  %-18s %s\n", $2, substr($0, index($0,$3)) }'
+        fi
     fi
 }
 
