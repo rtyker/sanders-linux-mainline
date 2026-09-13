@@ -55,10 +55,10 @@ ARM64_TC="aarch64-linux-gnu-"
 # mtime/arvore de objetos que nao sobrevive a um clone novo. ccache
 # cacheia pelo hash do fonte pre-processado, entao sobrevive a clones
 # novos e a "make clean". Aponta por padrao pro diretorio de cache ja
-# provisionado no projeto pai (cache_ccache_aarch64/, max_size=5G
+# provisionado no projeto pai (cache/ccache_aarch64/, max_size=5G
 # configurado la); ajustavel via CCACHE_DIR se este submodulo for
 # clonado isolado em outro lugar (sem esse diretorio sibling).
-CCACHE_DIR="${CCACHE_DIR:-$REPO/../cache_ccache_aarch64}"
+CCACHE_DIR="${CCACHE_DIR:-$REPO/../cache/ccache_aarch64}"
 export CCACHE_DIR
 mkdir -p "$CCACHE_DIR"
 
