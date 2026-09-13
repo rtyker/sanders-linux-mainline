@@ -556,3 +556,60 @@ docker run --rm -u 1000:1000 \
 
 *Configurado e validado ponta a ponta (build + deploy + boot verificado)
 por **BF** (agente Codebuff), 2026-09-10.*
+
+## 21. A2DP Sink não funciona — PipeWire nunca registra endpoints ("a2dp-sink profile connect failed: Protocol not available")
+
+**Data:** 2026-09-10 · **Status:** ✅ RESOLVIDO AO VIVO (áudio A2DP aptX HD verificado; continuidade entre reboots confirmada)
+
+**Sintoma:**
+- Celular pareia normalmente (`Paired: yes, Bonded: yes`), mas o áudio nunca
+  conecta. No `journalctl -u bluetooth` aparece:
+  `src/service.c:btd_service_connect() a2dp-sink profile connect failed for <MAC>: Protocol not available`.
+- `busctl tree org.bluez` não mostra nenhum `MediaEndpoint` registrado pelo
+  PipeWire; o card `bluez_card.<MAC>` não aparece no `pactl list cards`.
+
+**Causa raiz (WirePlumber 0.5.x):**
+- O script `monitors/bluez/enumerate-device.lua` **só cria o monitor BlueZ se o
+  estado do seat logind for `"active"`** (feature `monitor.bluez.seat-monitoring`).
+  Em appliance headless o usuário (`alarm`) **não tem sessão de seat ativa** —
+  o Weston roda fora do seat e `user@1000` fica apenas em estado
+  `"lingering"`. Resultado: `createMonitor()` nunca é chamado, o PipeWire
+  nunca registra os endpoints A2DP no bluetoothd, e o perfil morre com
+  "Protocol not available". O ALSA não é afetado porque o monitor ALSA não
+  tem esse gate — por isso o speaker local funciona e o BT não.
+
+**Solução (drop-in, persistente no reboot):**
+Criar `/etc/wireplumber/wireplumber.conf.d/50-sanders-bluetooth.conf`:
+```
+wireplumber.profiles = {
+  main = {
+    monitor.bluez.seat-monitoring = disabled
+  }
+}
+```
+Backportado ao repo em
+`rootfs-overlay/common/etc/wireplumber/wireplumber.conf.d/50-sanders-bluetooth.conf`.
+
+**Verificação ponta a ponta (após `systemctl --user restart wireplumber`):**
+1. `journalctl -u bluetooth | grep "Endpoint registered"` → 21 endpoints
+   (A2DPSink sbc/aac/aptx/aptx_hd/opus_05...), e passa a ocorrer
+   **automaticamente no boot** (confirmado após reboot: 21 endpoints no boot).
+2. Conectar o celular **pelo celular** (não pelo device: telefones recusam
+   `bluetoothctl connect` iniciado pelo sink com `br-connection-unknown`).
+3. `pactl set-card-profile bluez_card.<MAC> a2dp-sink` (o card pode subir com
+   perfil `audio-gateway`/HFP; o sink A2DP precisa ser selecionado — codecs
+   disponíveis: sbc, sbc_xq, aptx, **aptx_hd**, opus_05...).
+4. Sink criado: nó `bluez_output.<MAC>.1` (`media.class = Audio/Sink`,
+   `api.bluez5.codec = "aptx_hd"`), transporte AVDTP aberto
+   (`/org/bluez/.../sep2/fd0` no `busctl tree org.bluez`).
+
+**Pendência menor:** AVRCP (teclas de mídia do celular) exige
+`CONFIG_INPUT_UINPUT=y` — já adicionado ao `kernel/sanders.config.fragment`
+(vale na próxima rebuild do kernel; sem isso o bluetoothd loga
+`AVRCP: failed to create uinput` e só as teclas de mídia ficam sem efeito).
+
+**Ferramenta deixada no device:** `/root/a2dp_watch.sh` — observa a conexão
+do celular, força o perfil `a2dp-sink` se o card subir em HFP e reporta
+transportes abertos + `pw-top` do nó bluez (útil pra validar pós-boot).
+
+*Diagnosticado e resolvido ao vivo por **BF** (agente Codebuff), 2026-09-10.*

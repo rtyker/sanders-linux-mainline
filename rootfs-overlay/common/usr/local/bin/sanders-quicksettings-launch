@@ -1,0 +1,5 @@
+#!/bin/sh
+# Wrapper: herda o display Wayland do Weston (root) - BF 2026-09-10
+export XDG_RUNTIME_DIR=/run/user/0
+export WAYLAND_DISPLAY=wayland-1
+exec /usr/local/bin/sanders-quicksettings "$@"

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Wrapper para o Android Launcher GTK4
+export XDG_RUNTIME_DIR=/run/user/0
+export WAYLAND_DISPLAY=wayland-1
+exec /usr/local/bin/sanders-launcher "$@"

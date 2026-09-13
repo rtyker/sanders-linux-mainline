@@ -1,14 +1,14 @@
 [Unit]
-Description=Mobile MP3 Player GTK4
-After=sanders-weston-minimal.service sanders-volume-keys.service
+Description=Android Mobile Launcher GTK4
+After=sanders-weston-minimal.service
 PartOf=sanders-weston-minimal.service
 
 [Service]
 User=root
 Environment=XDG_RUNTIME_DIR=/run/user/0
 Environment=WAYLAND_DISPLAY=wayland-1
-ExecStart=/root/mp3_player/player_gtk4
-Restart=on-failure
+ExecStart=/usr/local/bin/sanders-launcher
+Restart=always
 RestartSec=2
 
 [Install]

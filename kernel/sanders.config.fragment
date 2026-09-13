@@ -137,6 +137,12 @@ CONFIG_INPUT_EVDEV=y
 CONFIG_INPUT_TOUCHSCREEN=y
 CONFIG_TOUCHSCREEN_EDT_FT5X06=y
 
+# uinput — bluetoothd cria um dispositivo virtual de input pro AVRCP
+# (controle de mídia do celular: play/pause/next no sink A2DP). Sem isso
+# o bluetoothd loga "AVRCP: failed to create uinput" e as teclas de mídia
+# do telefone não chegam no Linux. Builtin (sem modprobe no rootfs).
+CONFIG_INPUT_UINPUT=y
+
 # Landlock LSM (sandbox) — pacman usa em userspace pra isolar downloads.
 # Sem isso, pacman -Sy falha com "Landlock is not supported by kernel".
 CONFIG_SECURITY_LANDLOCK=y

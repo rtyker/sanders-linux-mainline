@@ -1,0 +1,16 @@
+[Unit]
+Description=Agente de pareamento Bluetooth headless (sanders)
+# PartOf: se o bluetoothd reiniciar, o registro do agente morre junto —
+# reinicia o agente tambem.
+PartOf=bluetooth.service
+After=bluetooth.service sanders-bt-mac.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/bluetoothctl pairable on
+ExecStart=/usr/bin/python3 /usr/local/bin/sanders-bt-agent.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
