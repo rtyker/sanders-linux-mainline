@@ -112,23 +112,16 @@ install_packages() {
         # acontece pra todos os alvos de uma vez) — confirmado ao vivo
         # 2026-09-04.
         #
-        # Sem podman (decidido 2026-09-04, docker ja cobre o caso de uso
-        # de containers, nao precisa dos dois) nem tmux (decidido
-        # 2026-09-04, sem necessidade real pra este uso).
+        # Sem podman nem tmux (decidido 2026-09-04, sem necessidade real
+        # pra este uso). Docker NAO entra aqui (movido em 2026-09-13 pro
+        # flavor separado "server-docker" — traz peso real, nem todo uso
+        # de servidor headless precisa de containers).
         pacman -Syu --noconfirm --needed \
-            htop git curl vim fastfetch docker bluez bluez-utils \
+            htop git curl vim fastfetch bluez bluez-utils \
             || echo "[sanders-server] WARN: falha instalando alguns pacotes via pacman"
 
         # Habilita bluetooth.service de forma idempotente (ordenado pos sanders-bt-mac)
         systemctl enable bluetooth.service >/dev/null 2>&1 || true
-
-        # docker fica instalado mas NUNCA habilitado por padrao — este e o
-        # flavor "server" headless, nao deve subir o daemon de containers
-        # sozinho no boot. `disable` aqui e so idempotencia/documentacao
-        # explicita da intencao (a instalacao via pacman ja nao habilita
-        # nada sozinha); use `systemctl enable --now docker` manualmente
-        # quando de fato for usar.
-        systemctl disable docker.service >/dev/null 2>&1 || true
 
     else
         echo "[sanders-server] ERRO: gerenciador de pacotes pacman não encontrado" >&2

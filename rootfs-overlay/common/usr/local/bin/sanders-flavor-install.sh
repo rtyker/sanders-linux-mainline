@@ -11,13 +11,17 @@
 #   sanders-flavor-install.sh <flavor>           # instala e habilita
 #   sanders-flavor-install.sh <flavor> --remove  # desabilita (nao desinstala pacotes)
 #
-# Flavors disponiveis: minimal, server, xorg, weston-minimal, xfce
+# Flavors disponiveis: minimal, server, server-docker, xorg, weston-minimal, xfce
 #
 # Reorganizado em 2026-09-04 (antes: "server" vivia so em
 # sanders-server-setup.sh, "minimal" nao existia como opcao explicita, e
 # os flavors graficos se chamavam xorg-minimal/wayland-minimal). Nomes
 # antigos (xorg-minimal, wayland-minimal) continuam aceitos como alias
 # com aviso de depreciacao — nao quebra scripts/memoria de quem já usava.
+#
+# 2026-09-13: Docker separado do flavor "server" pro novo flavor
+# "server-docker" — traz peso real (imagens, storage overlay, daemon),
+# nem todo uso de servidor headless precisa de containers.
 
 set -euo pipefail
 
@@ -46,7 +50,8 @@ DSI_CONNECTOR="DSI-1"
 list_flavors() {
     echo "Flavors disponiveis:"
     echo "  minimal          — apenas diagnostico, nenhum pacote instalado (roda sanders-server-setup.sh --status)"
-    echo "  server           — ferramentas basicas de servidor: htop, git, curl, vim, fastfetch, docker (instalado mas NUNCA habilitado por padrao), bluez, bluez-utils"
+    echo "  server           — ferramentas basicas de servidor: htop, git, curl, vim, fastfetch, bluez, bluez-utils (sem Docker)"
+    echo "  server-docker    — mesma base do 'server' + Docker (instalado mas NUNCA habilitado por padrao)"
     echo "  xorg             — so Xorg + xterm, sem desktop, pra rodar seu proprio app (tty1) + x11vnc (:5900) + teclas de Volume -> PipeWire [FALLBACK — Xorg trava o painel DSI em alguns casos, prefira weston-minimal]"
     echo "  weston-minimal   — Weston (compositor Wayland minimo, sem shell/painel extra) com GPU real (freedreno), backend VNC nativo (:5900) + teclas de Volume -> PipeWire [PREFERENCIAL]"
     echo "  xfce             — Xorg + XFCE4 (desktop leve via X11, tty1) + x11vnc (:5900) + teclas de Volume -> PipeWire"
@@ -199,6 +204,40 @@ flavor_server_install() {
 
 flavor_server_remove() {
     echo "[flavor:server] Este flavor nao tem servico proprio pra desabilitar"
+    echo "(htop/git/curl/vim/fastfetch/bluez/bluez-utils continuam instalados —"
+    echo "remova pacotes individuais via 'pacman -R <pacote>' se quiser)."
+}
+
+# --- Flavor: server-docker ------------------------------------------------
+#
+# Mesma base do flavor "server" (htop/git/curl/vim/fastfetch/bluez/
+# bluez-utils) + Docker por cima. Separado do "server" simples (2026-09-13)
+# porque Docker traz peso real (imagens, storage driver overlay, daemon)
+# que nem todo uso de servidor headless precisa — quem so quer as
+# ferramentas basicas de CLI usa "server"; quem precisa rodar containers
+# usa este.
+
+flavor_server_docker_install() {
+    echo "[flavor:server-docker] Instalando base do flavor server..."
+    /usr/local/bin/sanders-server-setup.sh --install
+
+    echo "[flavor:server-docker] Instalando Docker..."
+    pacman_install docker
+
+    # docker fica instalado mas NUNCA habilitado por padrao — mesma
+    # politica dos demais flavors: instalar != ligar sozinho no boot.
+    # `disable` aqui e so idempotencia/documentacao explicita da intencao
+    # (a instalacao via pacman ja nao habilita nada sozinha); use
+    # `systemctl enable --now docker` na mao quando de fato for usar.
+    systemctl disable docker.service >/dev/null 2>&1 || true
+
+    echo "[flavor:server-docker] Docker instalado mas NAO habilitado automaticamente. Pra ligar:"
+    echo "  systemctl enable --now docker.service"
+}
+
+flavor_server_docker_remove() {
+    echo "[flavor:server-docker] Desabilitando Docker (pacotes permanecem instalados)..."
+    systemctl disable --now docker.service 2>/dev/null || true
     echo "(htop/git/curl/vim/fastfetch/docker/bluez/bluez-utils continuam instalados —"
     echo "remova pacotes individuais via 'pacman -R <pacote>' se quiser)."
 }
@@ -477,6 +516,12 @@ case "$FLAVOR" in
         case "$ACTION" in
             --remove) flavor_server_remove ;;
             *)        flavor_server_install ;;
+        esac
+        ;;
+    server-docker)
+        case "$ACTION" in
+            --remove) flavor_server_docker_remove ;;
+            *)        flavor_server_docker_install ;;
         esac
         ;;
     xfce)
