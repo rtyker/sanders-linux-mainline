@@ -527,35 +527,50 @@ cross-compiler arm64 nem as ferramentas de empacotamento de boot.
 
 **Solução:** Docker (o usuário já está no grupo `docker`), com o projeto
 bind-mountado e o ccache do projeto reaproveitado. Receita commitada em
-`scratch/kbuild-docker/Dockerfile` (imagem `sanders-kbuild:bookworm`:
-`gcc-aarch64-linux-gnu`, `binutils-aarch64-linux-gnu`,
-`device-tree-compiler`, `bc flex bison`, `ccache`, `libssl-dev
-libelf-dev`, `mkbootimg`, `e2fsprogs`, `git`). Uso:
+`scratch/kbuild-docker/` (`Dockerfile` + `docker-compose.yml` + `README.md`
+— **esse README é a fonte de verdade**, o que segue aqui é só o resumo
+operacional). Imagem `sanders-kbuild:bookworm`: `gcc-aarch64-linux-gnu`,
+`binutils-aarch64-linux-gnu`, `device-tree-compiler`, `bc flex bison`,
+`ccache`, `ca-certificates`, `libssl-dev libelf-dev`, `mkbootimg`,
+`e2fsprogs`, `git`. Uso (via `docker compose`, atualizado 2026-09-13):
 
 ```bash
-docker build -q -t sanders-kbuild:bookworm scratch/kbuild-docker/
-docker run --rm -u 1000:1000 \
-  -v /mnt/hdauxiliar/android/projeto_g5:/proj \
-  -w /proj/sanders-linux-mainline/scripts \
-  sanders-kbuild:bookworm ./02-build-kernel.sh   # e depois ./06-build-boot.sh
+cd scratch/kbuild-docker
+docker compose build                                    # só se o Dockerfile mudou
+docker compose run --rm kbuild ./02-build-kernel.sh      # build completo (kernel/sanders.config.fragment)
+docker compose run --rm kbuild ./build-kernel-lean.sh    # build enxuto/headless (kernel/sanders-lean.config.fragment)
+docker compose run --rm kbuild                           # shell interativo pra debug
 ```
 
-- Rodar com `-u 1000:1000` pra os artefatos ficarem com o dono do host
-  (`anderson`, uid 1000).
-- O `CCACHE_DIR` do container aponta pra `/proj/cache_ccache_aarch64`
-  (mesmo cache do host) — ccache reutiliza normalmente entre container e
-  host.
+- **`network_mode: host` é obrigatório** (já no `docker-compose.yml`) —
+  a bridge default do Docker neste host não resolve DNS externo de
+  dentro do container (`git clone https://git.kernel.org/...` falha com
+  "Could not resolve host", mesmo com o host resolvendo normal e pulls
+  do Docker Hub funcionando). Confirmado ao vivo 2026-09-13.
+- **`ca-certificates` precisa estar na imagem** — sem isso o mesmo
+  `git clone https://...` falha com "Problem with the SSL CA cert" (a
+  `debian:13` minimal não vem com o bundle de CAs). Já no `Dockerfile`;
+  se reaparecer, é o primeiro suspeito. Confirmado ao vivo 2026-09-13.
+- Roda como o usuário do host (`user: "${UID:-1000}:${GID:-1000}"` no
+  compose) pra os artefatos ficarem com o dono certo, não `root`.
+- O `CCACHE_DIR` do container aponta pra `/proj/cache/ccache_aarch64`
+  (mesmo cache do host, path atualizado na reorganização de 2026-09-13 —
+  era `/proj/cache_ccache_aarch64` antes) — ccache reutiliza normalmente
+  entre container e host, e entre `02-build-kernel.sh`/`build-kernel-lean.sh`
+  (mesmo cache, fragments diferentes).
 - Timing observado: build de v7.2 com ~69% de cache miss ≈ **40 min**;
   builds incrementais/só-DTB levam segundos.
 - O deploy não muda: `10-deploy-boot.sh --reboot <IP>` roda no host
   (só precisa de `ssh`/`scp`).
 - **Armadilha pra agentes:** processos em background lançados num comando
   SYNC morrem quando o comando retorna — para builds longos usar
-  `setsid nohup ... &` + polling do log (o modo BACKGROUND da tool de
-  terminal não está implementado nesta sessão).
+  `setsid nohup ... &` + polling do log, ou o modo `run_in_background`
+  da tool de terminal quando disponível na sessão.
 
 *Configurado e validado ponta a ponta (build + deploy + boot verificado)
-por **BF** (agente Codebuff), 2026-09-10.*
+por **BF** (agente Codebuff), 2026-09-10. `docker-compose.yml`, fix de
+`ca-certificates`/`network_mode: host` e `build-kernel-lean.sh` validados
+ao vivo (build enxuto compilando de ponta a ponta) em 2026-09-13.*
 
 ## 21. A2DP Sink não funciona — PipeWire nunca registra endpoints ("a2dp-sink profile connect failed: Protocol not available")
 
