@@ -1,3 +1,6 @@
+# ARQUIVADO (2026-09-14): ver _tombstone/README.md — experimento
+# abandonado, aparelho revertido pro kernel completo.
+#
 # Config fragment "enxuto" (headless-only) pro Moto G5s Plus / G5 Plus —
 # deriva de sanders.config.fragment removendo tudo que so serve pros
 # flavors graficos (display, audio, touchscreen, sensores, LED). Uso

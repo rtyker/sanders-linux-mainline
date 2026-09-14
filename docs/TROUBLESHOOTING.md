@@ -538,7 +538,6 @@ operacional). Imagem `sanders-kbuild:bookworm`: `gcc-aarch64-linux-gnu`,
 cd scratch/kbuild-docker
 docker compose build                                    # só se o Dockerfile mudou
 docker compose run --rm kbuild ./02-build-kernel.sh      # build completo (kernel/sanders.config.fragment)
-docker compose run --rm kbuild ./build-kernel-lean.sh    # build enxuto/headless (kernel/sanders-lean.config.fragment)
 docker compose run --rm kbuild                           # shell interativo pra debug
 ```
 

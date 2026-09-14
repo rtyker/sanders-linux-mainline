@@ -1,6 +1,13 @@
 #!/bin/bash
+# ARQUIVADO (2026-09-14): experimento de kernel enxuto testado e deployado
+# ao vivo com sucesso no potter, mas o esforco foi abandonado a pedido do
+# usuario (ganho de tamanho modesto, ~6%, nao justificou o trabalho de
+# manter um segundo kernel). O aparelho foi revertido pro kernel completo.
+# Mantido aqui so como referencia caso alguem queira retomar. Ver
+# _tombstone/README.md.
+#
 # Build EXPERIMENTAL de um kernel "enxuto" (headless-only): mesma arvore/
-# patches/DTS do sanders, mas com kernel/sanders-lean.config.fragment
+# patches/DTS do sanders, mas com _tombstone/sanders-lean.config.fragment
 # (sem display/DRM/GPU, audio, touchscreen, sensores, LED — ver esse
 # arquivo pro detalhamento completo do que caiu e por que).
 #
@@ -41,7 +48,7 @@ if [ "$BUILD" = "$REPO/build" ]; then
     die "BUILD apontando pro build/ principal — isso derrotaria o proposito deste script (nao prejudicar o kernel atual). Rode sem sobrescrever \$BUILD, ou aponte pra outro diretorio."
 fi
 
-LEAN_FRAGMENT="$REPO/kernel/sanders-lean.config.fragment"
+LEAN_FRAGMENT="$REPO/_tombstone/sanders-lean.config.fragment"
 [ -f "$LEAN_FRAGMENT" ] || die "fragment enxuto nao encontrado: $LEAN_FRAGMENT"
 
 check_cmd "${ARM64_TC}gcc"

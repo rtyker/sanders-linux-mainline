@@ -1,6 +1,5 @@
 # Build artifacts e fontes externos (não versionar)
 build/
-build-lean/
 out/
 
 # Tarballs e binários grandes
