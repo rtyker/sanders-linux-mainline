@@ -628,3 +628,82 @@ do celular, força o perfil `a2dp-sink` se o card subir em HFP e reporta
 transportes abertos + `pw-top` do nó bluez (útil pra validar pós-boot).
 
 *Diagnosticado e resolvido ao vivo por **BF** (agente Codebuff), 2026-09-10.*
+
+## 22. `pacman -Syu --noconfirm` (flavor server) puxa upgrade completo do sistema e a interrupção no meio quebra `systemctl`
+
+**Data:** 2026-09-14
+**Status:** ✅ Resolvido ao vivo; sistema recuperado sem perda de dados.
+
+**Sintoma:** Ao rodar `sanders-flavor-install.sh server` (que chama
+`sanders-server-setup.sh --install` → `pacman -Syu --noconfirm --needed
+htop git curl vim fastfetch docker bluez bluez-utils`), o pacman não
+instalou só os pacotes pedidos — por ser `-Syu` (full system upgrade, de
+propósito, ver comentário no script), ele resolveu **39 pacotes**
+pendentes de atualização não relacionados, incluindo `linux-aarch64`
+(kernel genérico do Arch ARM, nunca usado por este projeto), `systemd`
+261.3, `mkinitcpio`, `gtk4`, `thunar`. O comando SSH ficou "parado" no
+prompt `Proceed with installation? [Y/n]` por >180s mesmo com
+`--noconfirm` (comportamento não totalmente entendido — possivelmente
+falta de PTY alocado via SSH não-interativo interagindo mal com algum
+hook). A sessão matou a conexão SSH local assumindo que estava travado —
+**mas o processo remoto continuou rodando** (SSH sem PTY não propaga
+SIGHUP de forma confiável pro processo remoto) e, na verdade, já tinha
+avançado pra fase de instalação. O kill aconteceu no meio da extração do
+pacote `systemd`, deixando `libsystemd-shared-261.3-1.so` ausente:
+`systemctl` parou de funcionar inteiro (`error while loading shared
+libraries`), e `/var/lib/pacman/local/systemd-261.3-1/` ficou com o
+`desc`/`files` faltando (banco de dados corrompido pra esse pacote).
+
+**Risco real:** o sistema continuou rodando (PID 1 já estava em memória,
+não precisa da lib nova pra continuar vivo; SSH/rede não dependem de
+`systemctl` pra seguir funcionando), mas um **reboot nesse estado
+provavelmente não voltaria** — `systemd` como PID 1 na próxima inicialização
+precisaria dos arquivos que estavam faltando.
+
+**Recuperação:**
+```bash
+# 1. Confirmar que pacman nao ficou com processo orfao rodando
+ps aux | grep pacman
+kill -TERM <pid>   # SO se ainda estiver ativo E antes da fase de instalacao
+
+# 2. Remover a entrada corrompida do banco local (nao apaga arquivos, so o bookkeeping)
+rm -rf /var/lib/pacman/local/systemd-261.3-1
+
+# 3. Reinstalar direto dos pacotes ja em cache (forca reinstalacao mesmo
+#    que o pacman ache que ja esta "up to date")
+pacman -U --noconfirm --overwrite '*' \
+  /var/cache/pacman/pkg/systemd-libs-261.3-1-aarch64.pkg.tar.xz \
+  /var/cache/pacman/pkg/systemd-261.3-1-aarch64.pkg.tar.xz \
+  /var/cache/pacman/pkg/systemd-sysvcompat-261.3-1-aarch64.pkg.tar.xz \
+  /var/cache/pacman/pkg/systemd-resolvconf-261.3-1-aarch64.pkg.tar.xz
+
+# 4. Terminar a transacao original (resto dos 39 pacotes) — dessa vez ate o fim
+pacman -Su --noconfirm
+
+# 5. Verificar integridade geral
+pacman -Dk                  # "No database errors have been found!" esperado
+systemctl --failed          # unidades que dispararam durante a janela quebrada
+                             # ficam "failed" por timing, nao por causa raiz —
+                             # confirmar rodando o comando manualmente antes de
+                             # se preocupar; systemctl reset-failed limpa
+```
+
+**Licoes pra proximas sessoes:**
+- **Nunca `Ctrl-C`/matar um `pacman -Syu`/`-Su` que parece "travado" via
+  SSH sem antes confirmar se ele ja passou de "Proceed with installation?"
+  pra "Processing package changes..."** — antes disso e seguro interromper
+  (nada foi escrito ainda); depois disso, deixar terminar e so depois
+  investigar, mesmo que demore.
+- `sanders-server-setup.sh`/`sanders-flavor-install.sh server*` usam
+  `-Syu` de proposito (evita partial upgrade, ver comentario no script) —
+  isso significa que rodar qualquer flavor puxa TODO o system upgrade
+  pendente, nao so os pacotes do flavor. E esperado, nao e bug — mas
+  puxa junto coisas nao relacionadas (`linux-aarch64`, `gtk4`, etc.) que
+  ficaram acumuladas de sessoes anteriores sem update.
+- SSH sem PTY (`ssh host cmd`, sem `-t`) nao mata o processo remoto
+  quando a conexao cai/e interrompida do lado local — o processo pode
+  continuar rodando "as cegas" no device. Pra ter certeza que algo parou
+  de verdade, reconectar e checar `ps aux` no device, nao so assumir pelo
+  client local ter sido encerrado.
+
+*Diagnosticado e recuperado ao vivo (Claude Sonnet 5, sessão Claude Code), 2026-09-14.*

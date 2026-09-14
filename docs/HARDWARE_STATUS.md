@@ -2,6 +2,24 @@
 
 Última atualização: 2026-09-10.
 
+> ⚠️ **AVISO IMPORTANTE (2026-09-14): o kernel ATIVO no aparelho físico
+> agora é o "enxuto" (`kernel/sanders-lean.config.fragment`,
+> `scripts/build-kernel-lean.sh`), não o completo documentado abaixo.**
+> A tabela desta página continua válida como **registro histórico do que
+> já foi validado e funciona no kernel completo** — mas com o kernel
+> enxuto atualmente rodando, os seguintes itens estão **intencionalmente
+> ausentes** (não instalados no `.config`, não é regressão, não
+> investigar como bug): Framebuffer console, Display MIPI-DSI, Wayland/
+> Weston, Phosh/Phoc, OpenGL/Xwayland, GPU (Adreno 506), Áudio,
+> Touchscreen, Proximidade/luz ambiente. Continuam funcionando
+> normalmente: rede (USB CDC ACM/ECM, Wi-Fi, USB OTG Ethernet),
+> Bluetooth, botões Volume/Power, watchdog, zram, Docker. Ver
+> `docs/FLAVORS.md` e `kernel/sanders-lean.config.fragment` pro
+> detalhamento completo do que foi removido e por quê. Pra voltar ao
+> kernel completo (com GPU/display/áudio), redeployar
+> `build/linux/arch/arm64/boot/Image.gz` (não o `build-lean/`) via
+> `10-deploy-boot.sh`.
+
 ## Visão geral
 
 | Componente | Status | Notas |
